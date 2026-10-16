@@ -38,6 +38,7 @@ function createEmptyMap({
     layer.data = Array(w * h).fill(0);
   }
   const map = {
+    type: 'map', // TMJ spec: root "type": "map"
     version: '1.2',
     tiledversion: '1.2.4',
     orientation: orient,

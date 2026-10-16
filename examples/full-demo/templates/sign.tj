@@ -1,0 +1,12 @@
+{
+  "type": "template",
+  "object": {
+    "name": "Sign",
+    "type": "Sign",
+    "width": 16,
+    "height": 8,
+    "properties": [
+      { "name": "text", "type": "string", "value": "欢迎来到像素村" }
+    ]
+  }
+}

@@ -8,8 +8,8 @@ FIX="$ROOT/fixtures"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 
-echo "== version 0.7.0 =="
-"${CLI[@]}" version | grep -q '0.7.0'
+echo "== version 0.7.1 =="
+"${CLI[@]}" version | grep -q '0.7.1'
 "${CLI[@]}" version | grep -q 'phase: 7'
 
 echo "== coord orthogonal =="
@@ -35,7 +35,8 @@ echo "== coord hexagonal =="
 HEX=$("${CLI[@]}" coord tile-to-pixel "$TMP/hex.tmj" --x 2 --y 1)
 echo "$HEX" | grep -q 'hexagonal'
 echo "$HEX" | python3 -c "import sys,json; d=json.load(sys.stdin); assert abs(d['pixel']['x']-80)<0.01 and abs(d['pixel']['y']-24)<0.01, d"
-HEXBACK=$("${CLI[@]}" coord pixel-to-tile "$TMP/hex.tmj" --x 80 --y 24)
+# hex centre of (2,1); (80,24) is the bbox corner and belongs to (2,0) per upstream HexagonalRenderer
+HEXBACK=$("${CLI[@]}" coord pixel-to-tile "$TMP/hex.tmj" --x 96 --y 40)
 echo "$HEXBACK" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['tile']['x']==2 and d['tile']['y']==1, d"
 
 echo "== prop types add/remove =="

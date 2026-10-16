@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "type": "tiled-web-stamp",
+  "width": 3,
+  "height": 3,
+  "source": {
+    "layer": "Layer 1",
+    "x": -4,
+    "y": -3
+  },
+  "data": [
+    4,
+    4,
+    4,
+    4,
+    6,
+    6,
+    4,
+    6,
+    6
+  ]
+}

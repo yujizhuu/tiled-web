@@ -58,7 +58,24 @@ function worldInfo(world, filePath) {
   };
 }
 
-function addMap(world, { fileName, x, y, width, height }) {
+/** Pixel size of a finite orthogonal/isometric map (Tiled MapRenderer::mapBoundingRect). */
+function mapPixelSize(absPath) {
+  try {
+    const { loadMap } = require('./load');
+    const m = loadMap(absPath);
+    if (m.infinite) return null;
+    if ((m.orientation || 'orthogonal') === 'orthogonal') return { width: m.width * m.tilewidth, height: m.height * m.tileheight };
+    if (m.orientation === 'isometric') {
+      const side = m.width + m.height;
+      return { width: (side * m.tilewidth) / 2, height: (side * m.tileheight) / 2 };
+    }
+  } catch {
+    /* unreadable map: leave size unset */
+  }
+  return null;
+}
+
+function addMap(world, { fileName, x, y, width, height, worldPath }) {
   if (!fileName) throw new Error('world add-map requires --file <map path or relative name>');
   if (!Array.isArray(world.maps)) world.maps = [];
   const entry = {
@@ -78,6 +95,15 @@ function addMap(world, { fileName, x, y, width, height }) {
     const h = Number(height);
     if (!Number.isFinite(h) || h < 0) throw new Error('world add-map: --height must be a non-negative number');
     entry.height = h;
+  }
+  // Tiled writes width/height for every world entry; fill them from the map file when omitted
+  if ((entry.width == null || entry.height == null) && worldPath) {
+    const abs = path.resolve(path.dirname(path.resolve(worldPath)), entry.fileName);
+    const size = mapPixelSize(abs);
+    if (size) {
+      if (entry.width == null) entry.width = size.width;
+      if (entry.height == null) entry.height = size.height;
+    }
   }
   // Replace existing same fileName (basename match) or append
   const base = path.basename(entry.fileName);

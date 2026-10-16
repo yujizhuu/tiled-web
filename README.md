@@ -22,7 +22,7 @@ macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
 ## CLI（Phase 7 · Agent 目标已达成）
 
-**Agent CLI 目标已达成（0.7.0）。** 无界面时可创建 / 查看 / 写瓦片 / 印章 / 模板（含目录索引）/ 无限地图 chunks / 管图层与对象 / 自定义属性与 `propertytypes`（`useAs` + 嵌套 class 展开）/ 图块集 / 自动地图 / World / 批量替换 GID / 坐标换算 / Wang·地形列举 / 导出 TMJ·TMX·CSV（TMX 支持无限 chunks 与 base64+zlib）。另提供 **零依赖 MCP stdio 包装**（`cli/mcp-server.js`）。需要 **Node.js 18+**。零 npm 依赖。
+**Agent CLI 目标已达成（0.7.1，已对照上游 Tiled 修正格式；全功能示例见 `examples/full-demo/`）。** 无界面时可创建 / 查看 / 写瓦片 / 印章 / 模板（含目录索引）/ 无限地图 chunks / 管图层与对象 / 自定义属性与 `propertytypes`（`useAs` + 嵌套 class 展开）/ 图块集 / 自动地图 / World / 批量替换 GID / 坐标换算 / Wang·地形列举 / 导出 TMJ·TMX·CSV（TMX 支持无限 chunks 与 base64+zlib）。另提供 **零依赖 MCP stdio 包装**（`cli/mcp-server.js`）。需要 **Node.js 18+**。零 npm 依赖。
 
 剩余未做能力均为 **GUI 专属**（实时自动地图、规则可视化编辑、Wang/地形笔刷、撤销栈等），见 [`tool/`](tool/)。
 
@@ -63,7 +63,7 @@ node cli/mcp-server.js   # stdio JSON-RPC，Content-Length 帧
 
 | 命令 | 作用 |
 |------|------|
-| `tiled-web version` | 版本与阶段（0.7.0 / Phase 7 · agent 目标达成） |
+| `tiled-web version` | 版本与阶段（0.7.1 / Phase 7 · agent 目标达成） |
 | `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal\|isometric\|hexagonal\|staggered] [--staggeraxis y\|x] [--staggerindex odd\|even] [--hexsidelength N] -o map.tmj` | 新建空瓦片层地图 |
 | `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
 | `tiled-web export map.tmj -f tmj\|tmx\|csv -o out [--encoding csv\|base64] [--compression zlib\|gzip]` | 导出；CSV 为第一瓦片层 GID；无限地图 TMJ/TMX 保留 chunks；TMX 可选 base64+zlib（无 zstd） |

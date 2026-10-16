@@ -1,0 +1,227 @@
+{
+  "type": "map",
+  "version": "1.2",
+  "tiledversion": "1.2.4",
+  "orientation": "isometric",
+  "renderorder": "right-down",
+  "width": 8,
+  "height": 8,
+  "tilewidth": 32,
+  "tileheight": 16,
+  "infinite": false,
+  "nextlayerid": 2,
+  "nextobjectid": 1,
+  "layers": [
+    {
+      "id": 1,
+      "name": "Layer 1",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 8,
+      "height": 8,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "village",
+      "tilewidth": 16,
+      "tileheight": 16,
+      "terrains": [
+        {
+          "name": "Grass",
+          "tile": 0
+        },
+        {
+          "name": "Dirt",
+          "tile": 1
+        },
+        {
+          "name": "Water",
+          "tile": 2
+        }
+      ],
+      "wangsets": [
+        {
+          "name": "Ground",
+          "tile": 0,
+          "cornercolors": [
+            {
+              "name": "Grass",
+              "color": "#ff50aa3c",
+              "tile": 0,
+              "probability": 1
+            },
+            {
+              "name": "Dirt",
+              "color": "#ff966e3c",
+              "tile": 1,
+              "probability": 1
+            }
+          ],
+          "edgecolors": [
+            {
+              "name": "Road",
+              "color": "#ffc8a06e",
+              "tile": 9,
+              "probability": 1
+            }
+          ],
+          "wangtiles": [
+            {
+              "tileid": 0,
+              "wangid": [
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1
+              ],
+              "hflip": false,
+              "vflip": false,
+              "dflip": false
+            },
+            {
+              "tileid": 1,
+              "wangid": [
+                0,
+                2,
+                0,
+                2,
+                0,
+                2,
+                0,
+                2
+              ],
+              "hflip": false,
+              "vflip": false,
+              "dflip": false
+            },
+            {
+              "tileid": 9,
+              "wangid": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0
+              ],
+              "hflip": false,
+              "vflip": false,
+              "dflip": false
+            }
+          ]
+        }
+      ],
+      "tiles": [
+        {
+          "id": 0,
+          "terrain": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 1,
+          "terrain": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "id": 2,
+          "terrain": [
+            2,
+            2,
+            2,
+            2
+          ]
+        }
+      ],
+      "columns": 8,
+      "tilecount": 32,
+      "imagewidth": 128,
+      "imageheight": 64,
+      "image": "../tiles.png"
+    }
+  ]
+}

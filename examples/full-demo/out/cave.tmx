@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.2" tiledversion="1.2.4" orientation="orthogonal" renderorder="right-down" width="16" height="16" tilewidth="16" tileheight="16" infinite="1" nextlayerid="2" nextobjectid="1">
+  <tileset firstgid="1" source="../village.tsx"/>
+  <layer id="1" name="Layer 1" width="16" height="16">
+    <data encoding="base64" compression="gzip">
+      <chunk x="-16" y="-16" width="16" height="16">
+        H4sIAAAAAAAAA2NgGAWjYBTQC7CgYXL0syFhSvUDAA8DRiYABAAA
+      </chunk>
+      <chunk x="0" y="-16" width="16" height="16">
+        H4sIAAAAAAAAA2NgGAWjYBSQC1goxGwDjAGoBHbWAAQAAA==
+      </chunk>
+      <chunk x="16" y="-16" width="16" height="16">
+        H4sIAAAAAAAAA2NgGAWjYBSQC1jQMKmADQkPhH4Ach+ttAAEAAA=
+      </chunk>
+      <chunk x="-16" y="0" width="16" height="16">
+        H4sIAAAAAAAAA2NgIA2wADEbEiYVUEM/Mh4Fo2AUkA8ALqKd6QAEAAA=
+      </chunk>
+      <chunk x="0" y="0" width="16" height="16">
+        H4sIAAAAAAAAA2NjYGBgG0DMQiEeBaNgFJAPABjHiaEABAAA
+      </chunk>
+      <chunk x="16" y="0" width="16" height="16">
+        H4sIAAAAAAAAA2NjYGBgA2JOIGZhIB2wIWFy9LOg4VEwCkYB/QAAHEUo6AAEAAA=
+      </chunk>
+      <chunk x="16" y="16" width="16" height="16">
+        H4sIAAAAAAAAA2NgGAWjYBQMNcACxZToZwNiAFLcrdQABAAA
+      </chunk>
+      <chunk x="32" y="16" width="16" height="16">
+        H4sIAAAAAAAAA2NgGAWjYBQMFGChUD8bhfoBHpoWtAAEAAA=
+      </chunk>
+      <chunk x="16" y="32" width="16" height="16">
+        H4sIAAAAAAAAA2NgIA+wADEbmXpHwSgYBYMDAABKfcYVAAQAAA==
+      </chunk>
+      <chunk x="32" y="32" width="16" height="16">
+        H4sIAAAAAAAAA2NjGAWjYBSMVAAAj4JCkQAEAAA=
+      </chunk>
+    </data>
+  </layer>
+</map>

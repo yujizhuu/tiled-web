@@ -2,7 +2,8 @@
 
 /**
  * Pixel ↔ tile coordinate helpers for orthogonal / isometric / hexagonal / staggered.
- * Matches the web UI formulas in tool/tiled.js (zoom=1, no infinite draw offset).
+ * Orthogonal/isometric match tool/tiled.js; staggered/hexagonal are ports of upstream Tiled
+ * HexagonalRenderer / StaggeredRenderer (zoom=1, no infinite draw offset).
  */
 
 function staggerOffset(index, staggerindex) {
@@ -21,6 +22,112 @@ function hexColStep(m) {
   const side = Number(m.hexsidelength || 0);
   if (m.orientation === 'hexagonal' && side > 0) return (m.tilewidth + side) / 2;
   return m.tilewidth * 0.75;
+}
+
+/**
+ * Port of upstream Tiled HexagonalRenderer::RenderParams (src/libtiled/hexagonalrenderer.cpp).
+ * Staggered maps use the same params with side length 0. Integer math mirrors the C++ ints.
+ */
+function renderParams(m) {
+  const staggerX = m.staggeraxis === 'x';
+  const staggerEven = m.staggerindex === 'even' ? 1 : 0;
+  let sideLengthX = 0;
+  let sideLengthY = 0;
+  if (m.orientation === 'hexagonal') {
+    if (staggerX) sideLengthX = m.hexsidelength | 0;
+    else sideLengthY = m.hexsidelength | 0;
+  }
+  const sideOffsetX = Math.trunc((m.tilewidth - sideLengthX) / 2);
+  const sideOffsetY = Math.trunc((m.tileheight - sideLengthY) / 2);
+  const columnWidth = sideOffsetX + sideLengthX;
+  const rowHeight = sideOffsetY + sideLengthY;
+  return {
+    staggerX, staggerEven, sideLengthX, sideLengthY, sideOffsetX, sideOffsetY, columnWidth, rowHeight,
+    tileWidth: columnWidth + sideOffsetX,
+    tileHeight: rowHeight + sideOffsetY,
+    doStaggerX: (x) => staggerX && ((x & 1) ^ staggerEven) === 1,
+    doStaggerY: (y) => !staggerX && ((y & 1) ^ staggerEven) === 1,
+  };
+}
+
+function hexTileToScreen(m, tileX, tileY) {
+  const p = renderParams(m);
+  const tx = Math.floor(tileX);
+  const ty = Math.floor(tileY);
+  let px;
+  let py;
+  if (p.staggerX) {
+    py = ty * (p.tileHeight + p.sideLengthY);
+    if (p.doStaggerX(tx)) py += p.rowHeight;
+    px = tx * p.columnWidth;
+  } else {
+    px = tx * (p.tileWidth + p.sideLengthX);
+    if (p.doStaggerY(ty)) px += p.columnWidth;
+    py = ty * p.rowHeight;
+  }
+  return { x: px, y: py };
+}
+
+// HexagonalRenderer::topLeft/topRight/bottomLeft/bottomRight
+function neighbor(m, kind, x, y) {
+  const e = m.staggerindex === 'even' ? 1 : 0;
+  const sy = m.staggeraxis !== 'x';
+  const odd = sy ? ((y & 1) ^ e) === 1 : ((x & 1) ^ e) === 1;
+  switch (kind) {
+    case 'tl': return sy ? (odd ? [x, y - 1] : [x - 1, y - 1]) : odd ? [x - 1, y] : [x - 1, y - 1];
+    case 'tr': return sy ? (odd ? [x + 1, y - 1] : [x, y - 1]) : odd ? [x + 1, y] : [x + 1, y - 1];
+    case 'bl': return sy ? (odd ? [x, y + 1] : [x - 1, y + 1]) : odd ? [x - 1, y + 1] : [x - 1, y];
+    default: return sy ? (odd ? [x + 1, y + 1] : [x, y + 1]) : odd ? [x + 1, y + 1] : [x + 1, y];
+  }
+}
+
+function hexScreenToTile(m, x, y) {
+  const p = renderParams(m);
+  if (p.staggerX) x -= p.staggerEven ? p.tileWidth : p.sideOffsetX;
+  else y -= p.staggerEven ? p.tileHeight : p.sideOffsetY;
+  const ref = [Math.floor(x / (p.columnWidth * 2)), Math.floor(y / (p.rowHeight * 2))];
+  const rel = [x - ref[0] * (p.columnWidth * 2), y - ref[1] * (p.rowHeight * 2)];
+  const ai = p.staggerX ? 0 : 1;
+  ref[ai] = ref[ai] * 2 + (p.staggerEven ? 1 : 0);
+  let centers;
+  if (p.staggerX) {
+    const left = Math.trunc(p.sideLengthX / 2);
+    const cx = left + p.columnWidth;
+    const cy = Math.trunc(p.tileHeight / 2);
+    centers = [[left, cy], [cx, cy - p.rowHeight], [cx, cy + p.rowHeight], [cx + p.columnWidth, cy]];
+  } else {
+    const top = Math.trunc(p.sideLengthY / 2);
+    const cx = Math.trunc(p.tileWidth / 2);
+    const cy = top + p.rowHeight;
+    centers = [[cx, top], [cx - p.columnWidth, cy], [cx + p.columnWidth, cy], [cx, cy + p.rowHeight]];
+  }
+  let nearest = 0;
+  let min = Infinity;
+  centers.forEach((c, i) => {
+    const d = (c[0] - rel[0]) ** 2 + (c[1] - rel[1]) ** 2;
+    if (d < min) { min = d; nearest = i; }
+  });
+  const offs = p.staggerX ? [[0, 0], [1, -1], [1, 0], [2, 0]] : [[0, 0], [-1, 1], [0, 1], [0, 2]];
+  return { x: ref[0] + offs[nearest][0], y: ref[1] + offs[nearest][1] };
+}
+
+// StaggeredRenderer::screenToTileCoords (integer part)
+function staggeredScreenToTile(m, x, y) {
+  const p = renderParams(m);
+  let ax = x;
+  let ay = y;
+  if (p.staggerX) ax -= p.staggerEven ? p.sideOffsetX : 0;
+  else ay -= p.staggerEven ? p.sideOffsetY : 0;
+  let ref = [Math.floor(ax / p.tileWidth), Math.floor(ay / p.tileHeight)];
+  const rel = [ax - ref[0] * p.tileWidth, ay - ref[1] * p.tileHeight];
+  const ai = p.staggerX ? 0 : 1;
+  ref[ai] = ref[ai] * 2 + (p.staggerEven ? 1 : 0);
+  const yPos = rel[0] * (p.tileHeight / p.tileWidth);
+  if (p.sideOffsetY - yPos > rel[1]) ref = neighbor(m, 'tl', ref[0], ref[1]);
+  if (-p.sideOffsetY + yPos > rel[1]) ref = neighbor(m, 'tr', ref[0], ref[1]);
+  if (p.sideOffsetY + yPos < rel[1]) ref = neighbor(m, 'bl', ref[0], ref[1]);
+  if (p.sideOffsetY * 3 - yPos < rel[1]) ref = neighbor(m, 'br', ref[0], ref[1]);
+  return { x: ref[0], y: ref[1] };
 }
 
 function resolveMapMeta(mapOrFlags) {
@@ -64,13 +171,8 @@ function tileToPixel(mapOrFlags, tileX, tileY) {
     px = (x - y) * m.tilewidth / 2 + (m.height * m.tilewidth / 2);
     py = (x + y) * m.tileheight / 2;
   } else if (m.orientation === 'staggered' || m.orientation === 'hexagonal') {
-    if (m.staggeraxis === 'x') {
-      px = x * hexColStep(m);
-      py = y * m.tileheight + staggerOffset(x, m.staggerindex) * m.tileheight / 2;
-    } else {
-      px = x * m.tilewidth + staggerOffset(y, m.staggerindex) * m.tilewidth / 2;
-      py = y * hexRowStep(m);
-    }
+    // upstream HexagonalRenderer::tileToScreenCoords (also used by StaggeredRenderer)
+    ({ x: px, y: py } = hexTileToScreen(m, x, y));
   } else {
     // orthogonal (default)
     px = x * m.tilewidth;
@@ -107,14 +209,10 @@ function pixelToTile(mapOrFlags, pixelX, pixelY) {
     y = (py / (m.tileheight / 2) - px / (m.tilewidth / 2)) / 2 + m.height / 2;
     x = Math.floor(x);
     y = Math.floor(y);
-  } else if (m.orientation === 'staggered' || m.orientation === 'hexagonal') {
-    if (m.staggeraxis === 'x') {
-      x = Math.floor(px / hexColStep(m));
-      y = Math.floor((py - staggerOffset(x, m.staggerindex) * m.tileheight / 2) / m.tileheight);
-    } else {
-      y = Math.floor(py / hexRowStep(m));
-      x = Math.floor((px - staggerOffset(y, m.staggerindex) * m.tilewidth / 2) / m.tilewidth);
-    }
+  } else if (m.orientation === 'hexagonal') {
+    ({ x, y } = hexScreenToTile(m, px, py));
+  } else if (m.orientation === 'staggered') {
+    ({ x, y } = staggeredScreenToTile(m, px, py));
   } else {
     x = Math.floor(px / m.tilewidth);
     y = Math.floor(py / m.tileheight);

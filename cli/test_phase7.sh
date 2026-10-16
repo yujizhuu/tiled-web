@@ -8,8 +8,8 @@ FIX="$ROOT/fixtures"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 
-echo "== version 0.7.0 =="
-"${CLI[@]}" version | grep -q '0.7.0'
+echo "== version 0.7.1 =="
+"${CLI[@]}" version | grep -q '0.7.1'
 "${CLI[@]}" version | grep -q 'phase: 7'
 
 echo "== template index =="

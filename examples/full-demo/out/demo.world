@@ -1,0 +1,18 @@
+{
+  "type": "world",
+  "maps": [
+    {
+      "fileName": "village.tmj",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 224
+    },
+    {
+      "fileName": "cave.tmj",
+      "x": 320,
+      "y": 0
+    }
+  ],
+  "patterns": []
+}

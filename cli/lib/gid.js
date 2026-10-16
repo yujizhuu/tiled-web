@@ -4,7 +4,9 @@
 const FLIP_H = 0x80000000;
 const FLIP_V = 0x40000000;
 const FLIP_D = 0x20000000;
-const GID_MASK = 0x1fffffff;
+const FLIP_HEX120 = 0x10000000; // hexagonal 120° rotation (Tiled >= 1.? ; TMX spec)
+// Upstream Tiled masks all four flag bits: gid & ~(0xF0000000)
+const GID_MASK = 0x0fffffff;
 
 function decodeGid(raw) {
   const g = raw >>> 0;
@@ -58,6 +60,7 @@ module.exports = {
   FLIP_H,
   FLIP_V,
   FLIP_D,
+  FLIP_HEX120,
   GID_MASK,
   decodeGid,
   encodeGid,

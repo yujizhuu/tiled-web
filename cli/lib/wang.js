@@ -82,24 +82,31 @@ function parseTerrainsFromXml(text) {
 
 function summarizeWangSet(ws) {
   if (!ws || typeof ws !== 'object') return null;
-  const tiles = ws.tiles || ws.wangtiles || {};
-  const tileCount = Array.isArray(tiles)
+  const tiles = ws.tiles || ws.wangtiles;
+  const tileCount = !tiles
+    ? ws.tileCount || 0
+    : Array.isArray(tiles)
     ? tiles.length
     : typeof tiles === 'object'
       ? Object.keys(tiles).length
       : ws.tileCount || 0;
+  const t15 = ws.type || 'mixed';
+  const colors15 = Array.isArray(ws.colors) ? ws.colors : Array.isArray(ws.wangcolors) ? ws.wangcolors : [];
+  const edgeList = ws.edgeColors || ws.edgecolors || (t15 !== 'corner' ? colors15 : []);
+  const cornerList = ws.cornerColors || ws.cornercolors || (t15 === 'corner' ? colors15 : []);
   return {
     name: ws.name || '',
     tile: ws.tile != null ? ws.tile : 0,
-    edgeColorCount: (ws.edgeColors || ws.colors || []).length || (ws.wangcolors ? ws.wangcolors.length : 0),
-    cornerColorCount: (ws.cornerColors || []).length,
+    // Tiled JSON 1.2: edgecolors/cornercolors; Tiled 1.5+: colors (+ type); CLI internal: camelCase
+    edgeColorCount: edgeList.length,
+    cornerColorCount: cornerList.length,
     tileCount,
-    edgeColors: (ws.edgeColors || []).map((c) => ({
+    edgeColors: edgeList.map((c) => ({
       name: c.name || '',
       color: c.color,
       tile: c.tile,
     })),
-    cornerColors: (ws.cornerColors || []).map((c) => ({
+    cornerColors: cornerList.map((c) => ({
       name: c.name || '',
       color: c.color,
       tile: c.tile,

@@ -1,0 +1,82 @@
+{
+  "type": "map",
+  "version": "1.2",
+  "tiledversion": "1.2.4",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "width": 1,
+  "height": 2,
+  "tilewidth": 16,
+  "tileheight": 16,
+  "infinite": false,
+  "nextlayerid": 5,
+  "nextobjectid": 1,
+  "layers": [
+    {
+      "id": 1,
+      "name": "regions",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 2,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "name": "input_Walls",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 2,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        4,
+        0
+      ]
+    },
+    {
+      "id": 3,
+      "name": "inputnot_Walls",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 2,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        0,
+        4
+      ]
+    },
+    {
+      "id": 4,
+      "name": "output_Shadow",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 2,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        0,
+        5
+      ]
+    }
+  ],
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "source": "../village.tsx"
+    }
+  ]
+}

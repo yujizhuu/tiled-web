@@ -500,12 +500,18 @@ function runCli(args) {
   };
 }
 
+// Framing of the peer, detected from the first inbound message. The MCP stdio transport spec
+// (modelcontextprotocol.io, "Transports > stdio") is newline-delimited JSON; Content-Length
+// (LSP-style) is accepted for legacy clients and then mirrored back.
+let framing = null; // 'cl' | 'ndjson'
+
 function send(msg) {
-  const body = JSON.stringify(msg);
-  // MCP stdio: Content-Length framed (LSP-style) OR newline-delimited JSON.
-  // Prefer Content-Length for Cursor compatibility.
-  const payload = `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`;
-  process.stdout.write(payload);
+  const body = JSON.stringify(msg); // JSON.stringify never emits raw newlines
+  if (framing === 'cl') {
+    process.stdout.write(`Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`);
+  } else {
+    process.stdout.write(body + '\n');
+  }
 }
 
 function okResult(id, result) {
@@ -611,6 +617,7 @@ function start() {
         }
       }
 
+      framing = mode;
       if (mode === 'cl') {
         const sep = buffer.indexOf('\r\n\r\n');
         if (sep < 0) break;

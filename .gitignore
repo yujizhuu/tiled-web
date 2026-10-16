@@ -14,3 +14,5 @@ node_modules/
 dist/
 .cache/
 cli/tmp_smoke/
+examples/full-demo/out/validate/*.json
+examples/full-demo/out/validate/*.tmj

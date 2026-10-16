@@ -105,7 +105,7 @@ function parseTemplateXml(text, fileName) {
   const textNode = objInner.match(/<text\b[^>]*>([\s\S]*?)<\/text>/i);
   if (textNode) object.text = textNode[1];
 
-  const props = {};
+  const props = [];
   const propRe = /<property\b([^>]*)(\/>|>([\s\S]*?)<\/property>)/gi;
   let pm;
   while ((pm = propRe.exec(objInner))) {
@@ -117,9 +117,9 @@ function parseTemplateXml(text, fileName) {
     if (t === 'bool' || t === 'boolean') val = val === 'true' || val === '1';
     else if (t === 'int' || t === 'integer') val = parseInt(val, 10) || 0;
     else if (t === 'float' || t === 'number') val = parseFloat(val) || 0;
-    props[attrs.name] = val;
+    props.push({ name: attrs.name, type: t, value: val });
   }
-  if (Object.keys(props).length) object.properties = props;
+  if (props.length) object.properties = props;
 
   return { name: fileName, fileName, object, tileset, format: 'xml' };
 }
@@ -305,7 +305,15 @@ function applyTemplate(map, {
   obj.id = nextObjectId(map);
   obj.x = xx;
   obj.y = yy;
-  obj.template = tpl.fileName || tpl.name || 'template';
+  // TMJ/TMX "template" is a path relative to the map file (Tiled resolves it against the map dir)
+  if (templatePath && mapPath) {
+    obj.template = path
+      .relative(path.dirname(path.resolve(mapPath)), path.resolve(templatePath))
+      .split(path.sep)
+      .join('/');
+  } else {
+    obj.template = tpl.fileName || tpl.name || 'template';
+  }
 
   if (tilesetMerge && tilesetMerge.gidRemap && tilesetMerge.gidRemap._applyToObject) {
     obj.gid = tilesetMerge.gidRemap.to;

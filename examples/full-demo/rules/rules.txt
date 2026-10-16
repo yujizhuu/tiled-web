@@ -1,0 +1,2 @@
+# AutoMapping rules (Tiled rules.txt: one rule map per line, relative to this file)
+shadow.tmj

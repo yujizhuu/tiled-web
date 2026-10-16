@@ -204,8 +204,26 @@
     if (l.type === 'group') l.layers = Array.isArray(l.layers) ? l.layers.map(normalizeLayer) : [];
     return l;
   }
+  // Official Tiled JSON (>= 1.2, and tiled-web CLI >= 0.7.1) stores properties as
+  // [{name,type,value}]; the editor model uses { name: value, __propertyTypes }.
+  function uiProps(props) {
+    if (!Array.isArray(props)) return props;
+    const out = {}; const types = {};
+    props.forEach((p) => { if (p && p.name != null) { out[p.name] = p.value; types[p.name] = p.type || 'string'; } });
+    out.__propertyTypes = types;
+    return out;
+  }
+  function uiPropsDeep(o) {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o.properties)) o.properties = uiProps(o.properties);
+    (o.layers || []).forEach(uiPropsDeep);
+    (o.objects || []).forEach(uiPropsDeep);
+    (o.tilesets || []).forEach(uiPropsDeep);
+    if (Array.isArray(o.tiles)) o.tiles.forEach(uiPropsDeep);
+  }
   function normalizeMap(map) {
     const m = map || {};
+    uiPropsDeep(m);
     m.width = Number(m.width || 1); m.height = Number(m.height || 1);
     m.tilewidth = Number(m.tilewidth || 32); m.tileheight = Number(m.tileheight || 32);
     m.staggeraxis = m.staggeraxis || 'y'; m.staggerindex = m.staggerindex || 'odd';

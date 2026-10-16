@@ -7,6 +7,7 @@
  * Agents: this CLI
  */
 
+const fs = require('fs');
 const path = require('path');
 const { die, writeText, resolveLayer, setTileAt, parseIntFlag } = require('../lib/util');
 const { createEmptyMap } = require('../lib/create');
@@ -192,7 +193,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6)\n`);
+  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6; 0.7.1 upstream-conformance fixes)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -534,7 +535,30 @@ function cmdProp(positional, flags) {
     const file = positional[2];
     if (!tsub) die('prop types requires subcommand: list|get|add|remove');
     if (!file) die(`prop types ${tsub} requires a map path`);
-    const map = loadMap(file);
+    // Upstream Tiled stores custom types in the *project* file (.tiled-project, key "propertyTypes",
+    // each with a numeric id). Support that directly; map-embedded propertytypes stay as CLI extension.
+    const isProject = /\.tiled-project$/i.test(file);
+    let project = null;
+    let map;
+    if (isProject) {
+      project = fs.existsSync(file)
+        ? JSON.parse(fs.readFileSync(file, 'utf8'))
+        : { automappingRulesFile: '', commands: [], extensionsPath: 'extensions', folders: ['.'], propertyTypes: [] };
+      map = { propertytypes: Array.isArray(project.propertyTypes) ? project.propertyTypes : [] };
+    } else {
+      map = loadMap(file);
+    }
+    const saveTypes = () => {
+      if (!isProject) return saveMap(map, { output: flags.output, inPlacePath: file });
+      const list = map.propertytypes || [];
+      let next = list.reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
+      for (const t of list) if (!Number.isInteger(t.id)) t.id = next++;
+      project.propertyTypes = list;
+      const out = flags.output || file;
+      const body = JSON.stringify(project, null, 4) + '\n';
+      fs.writeFileSync(out, body);
+      return { path: path.resolve(out), format: 'tiled-project', bytes: Buffer.byteLength(body) };
+    };
     if (tsub === 'list') {
       process.stdout.write(
         JSON.stringify(
@@ -565,13 +589,14 @@ function cmdProp(positional, flags) {
     }
     if (tsub === 'add') {
       const rec = addPropertyType(map, flags);
-      const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+      const saved = saveTypes();
       ok({ action: 'prop-types-add', propertytype: rec, ...saved });
       return;
     }
     if (tsub === 'remove') {
       const removed = removePropertyType(map, flags.name);
-      const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+      if (!map.propertytypes) map.propertytypes = [];
+      const saved = saveTypes();
       ok({
         action: 'prop-types-remove',
         removed: { name: removed.name, type: removed.type || removed.kind },
@@ -730,7 +755,7 @@ function cmdTemplate(positional, flags) {
       x: flags.x,
       y: flags.y,
       createLayer: !!(flags['create-layer'] || flags.createLayer),
-      mapPath: file,
+      mapPath: flags.output || file,
       templatePath: tplPath,
       mergeTileset: !(flags['no-merge-tileset'] || flags.noMergeTileset),
     });
@@ -825,6 +850,7 @@ function cmdWorld(positional, flags) {
       y: flags.y,
       width: flags.width,
       height: flags.height,
+      worldPath: file,
     });
     const saved = saveWorld(world, flags.output || file);
     ok({ action: 'world-add-map', ...result, ...saved });

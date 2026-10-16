@@ -8,7 +8,7 @@ rm -rf "$TMP"
 mkdir -p "$TMP"
 
 echo "== version =="
-"${CLI[@]}" version | grep -q '0.7.0'
+"${CLI[@]}" version | grep -q '0.7.1'
 "${CLI[@]}" version | grep -q 'phase: 7'
 
 echo "== new =="
@@ -177,5 +177,8 @@ echo "== phase 6 =="
 
 echo "== phase 7 =="
 "$ROOT/test_phase7.sh"
+
+echo "== phase 8 (0.7.1 upstream conformance) =="
+"$ROOT/test_phase8.sh"
 
 echo "OK: Phase 7 CLI smoke passed"

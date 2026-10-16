@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.2" tiledversion="1.2.4" orientation="orthogonal" renderorder="right-down" width="20" height="14" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="9">
+  <properties>
+    <property name="title" value="像素村"/>
+    <property name="difficulty" type="int" value="2"/>
+  </properties>
+  <tileset firstgid="1" source="../village.tsx"/>
+  <tileset firstgid="33" name="items" tilewidth="16" tileheight="16" tilecount="32" columns="8">
+   <properties>
+     <property name="kind" value="pickups"/>
+   </properties>
+   <image source="../tiles.png" width="128" height="64"/>
+  </tileset>
+  <layer id="1" name="Ground" width="20" height="14">
+    <data encoding="base64" compression="zlib">
+      eJxjZGBgYBxmmA0JD0Z1QxlzURkTaye1/YAuxoyGh7t51A4/XBgA68wCVw==
+    </data>
+  </layer>
+  <layer id="2" name="Walls" width="20" height="14">
+    <properties>
+      <property name="collision" type="bool" value="true"/>
+    </properties>
+    <data encoding="base64" compression="zlib">
+      eJxjYBhYwIIFU6oOH38wqANhDgbi/EtI3SgYBYMZAACMTwB5
+    </data>
+  </layer>
+  <layer id="3" name="Shadow" width="20" height="14">
+    <data encoding="base64" compression="zlib">
+      eJxjYBh+gBUJU0PdYAbI7sfnF2LVjYJRQE0AANCYAEc=
+    </data>
+  </layer>
+  <layer id="4" name="Deco" width="20" height="14">
+    <data encoding="base64" compression="zlib">
+      eJxjYBgFo2BkAl4GhgZi1LEj6AYo7QClF9DAWcMKAAB/sgIK
+    </data>
+  </layer>
+  <objectgroup id="6" name="Objects">
+    <object id="1" name="PlayerSpawn" type="Player" x="72" y="124" width="0" height="0">
+     <properties>
+       <property name="speed" type="float" value="1.25"/>
+     </properties>
+     <point/></object>
+    <object id="2" name="Village" type="Zone" x="0" y="0" width="320" height="224"/>
+    <object id="3" name="Pond" type="Water" x="224" y="144" width="64" height="48"><ellipse/></object>
+    <object id="4" name="Fence" type="Collision" x="16" y="176" width="48" height="16"><polygon points="0,0 48,0 48,16 0,16"/></object>
+    <object id="7" template="../templates/chest.tx" name="Chest" type="Loot" x="64" y="64" width="16" height="16" gid="9">
+     <properties>
+       <property name="gold" type="int" value="25"/>
+       <property name="locked" type="bool" value="true"/>
+     </properties>
+     </object>
+    <object id="8" template="../templates/sign.tj" name="Sign" type="Sign" x="150" y="100" width="16" height="8">
+     <properties>
+       <property name="text" value="欢迎来到像素村"/>
+     </properties>
+     </object>
+  </objectgroup>
+  <objectgroup id="7" name="Spawns">
+    <object id="6" name="Enemy" type="Slime" x="260" y="40" width="0" height="0"><point/></object>
+  </objectgroup>
+</map>

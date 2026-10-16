@@ -1,0 +1,50 @@
+{
+    "automappingRulesFile": "",
+    "commands": [],
+    "extensionsPath": "extensions",
+    "folders": [
+        "."
+    ],
+    "propertyTypes": [
+        {
+            "name": "Faction",
+            "type": "enum",
+            "values": [
+                "villager",
+                "monster",
+                "neutral"
+            ],
+            "storageType": "string",
+            "useAs": [
+                "property"
+            ],
+            "useAsPropertyValue": true,
+            "useAsMapType": false,
+            "useAsLayerType": false,
+            "useAsObjectType": false,
+            "useAsTileType": false,
+            "id": 1
+        },
+        {
+            "name": "Stats",
+            "type": "class",
+            "members": [
+                {
+                    "name": "hp",
+                    "type": "int",
+                    "value": 10
+                }
+            ],
+            "useAs": [
+                "property",
+                "object"
+            ],
+            "useAsPropertyValue": true,
+            "useAsMapType": false,
+            "useAsLayerType": false,
+            "useAsObjectType": true,
+            "useAsTileType": false,
+            "id": 2
+        }
+    ]
+}

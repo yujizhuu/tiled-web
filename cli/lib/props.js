@@ -4,12 +4,18 @@ const { resolveLayer, walkLayers } = require('./util');
 
 /**
  * Custom properties helpers.
- * Storage: prefer plain object { name: value } (matches web UI + CLI TMX parse).
- * Also accept official Tiled JSON array [{name,type,value}] when reading.
+ * Storage: official Tiled JSON (>= 1.2) array [{name, type, value}] — see
+ * https://doc.mapeditor.org/en/stable/reference/json-map-format/#property
+ * The legacy Tiled <= 1.1 object form {name: value} (+ sibling "propertytypes") is still read and is
+ * upgraded to the array form on the first write.
  */
 
 function isPropArray(props) {
   return Array.isArray(props);
+}
+
+function inferType(v) {
+  return typeof v === 'boolean' ? 'bool' : typeof v === 'number' ? (Number.isInteger(v) ? 'int' : 'float') : 'string';
 }
 
 function toObjectMap(props) {
@@ -25,49 +31,58 @@ function toObjectMap(props) {
   return out;
 }
 
-function ensureObjectProps(owner) {
-  if (!owner.properties) {
-    owner.properties = {};
-    return owner.properties;
-  }
-  if (isPropArray(owner.properties)) {
-    owner.properties = toObjectMap(owner.properties);
-  }
+/** Normalize any properties representation to the Tiled array form (new array). */
+function toPropArray(props) {
+  if (!props) return [];
+  if (isPropArray(props)) return props.filter((p) => p && p.name != null).map((p) => ({ type: inferType(p.value), ...p }));
+  if (typeof props !== 'object') return [];
+  return Object.keys(props).map((name) => ({ name, type: inferType(props[name]), value: props[name] }));
+}
+
+function ensureArrayProps(owner) {
+  owner.properties = toPropArray(owner.properties);
   return owner.properties;
 }
 
 function listProps(owner) {
-  const map = toObjectMap(owner && owner.properties);
-  return Object.keys(map)
-    .sort()
-    .map((name) => ({
-      name,
-      value: map[name],
-      type: typeof map[name] === 'boolean' ? 'bool' : typeof map[name] === 'number' ? (Number.isInteger(map[name]) ? 'int' : 'float') : 'string',
-    }));
+  return toPropArray(owner && owner.properties)
+    .slice()
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .map((p) => ({ name: p.name, value: p.value, type: p.type || inferType(p.value), ...(p.propertytype ? { propertytype: p.propertytype } : {}) }));
 }
 
 function getProp(owner, name) {
   if (!name || name === true) throw new Error('prop get/set/remove requires --name <key>');
-  const map = toObjectMap(owner && owner.properties);
-  if (!(name in map)) throw new Error(`Property not found: ${name}`);
-  return { name, value: map[name] };
+  const p = toPropArray(owner && owner.properties).find((x) => x.name === String(name));
+  if (!p) throw new Error(`Property not found: ${name}`);
+  return { name: p.name, value: p.value, type: p.type };
 }
 
 function setProp(owner, name, value, typeHint) {
   if (!name || name === true) throw new Error('prop set requires --name <key>');
   if (value === undefined) throw new Error('prop set requires --value <value>');
-  const props = ensureObjectProps(owner);
+  const props = ensureArrayProps(owner);
   let v = value;
+  let type;
   const t = typeHint != null && typeHint !== true ? String(typeHint).toLowerCase() : null;
   if (t === 'bool' || t === 'boolean') {
     v = value === true || value === 'true' || value === '1' || value === 1;
+    type = 'bool';
   } else if (t === 'int' || t === 'integer') {
     v = Number(value);
     if (!Number.isInteger(v)) throw new Error(`Property "${name}" type=int but value is not an integer: ${value}`);
+    type = 'int';
   } else if (t === 'float' || t === 'number') {
     v = Number(value);
     if (!Number.isFinite(v)) throw new Error(`Property "${name}" type=float but value is not a number: ${value}`);
+    type = 'float';
+  } else if (t === 'color' || t === 'file') {
+    v = String(value);
+    type = t;
+  } else if (t === 'object') {
+    v = Number(value);
+    if (!Number.isInteger(v)) throw new Error(`Property "${name}" type=object needs an object id`);
+    type = 'object';
   } else if (t === 'string' || t == null) {
     // auto-detect when no hint: keep bool/number if already typed; else string
     if (t == null && typeof value !== 'boolean' && typeof value !== 'number') {
@@ -78,21 +93,25 @@ function setProp(owner, name, value, typeHint) {
     } else if (t === 'string') {
       v = String(value === true ? 'true' : value == null ? '' : value);
     }
+    type = t === 'string' ? 'string' : inferType(v);
   } else {
-    throw new Error(`Unknown property --type: ${typeHint} (use string|int|float|bool)`);
+    throw new Error(`Unknown property --type: ${typeHint} (use string|int|float|bool|color|file|object)`);
   }
-  props[name] = v;
-  return { name, value: v };
+  const rec = { name: String(name), type, value: v };
+  const i = props.findIndex((p) => p.name === rec.name);
+  if (i >= 0) props[i] = rec;
+  else props.push(rec);
+  return { name: rec.name, value: v, type };
 }
 
 function removeProp(owner, name) {
   if (!name || name === true) throw new Error('prop remove requires --name <key>');
-  const props = ensureObjectProps(owner);
-  if (!(name in props)) throw new Error(`Property not found: ${name}`);
-  const old = props[name];
-  delete props[name];
-  if (Object.keys(props).length === 0) delete owner.properties;
-  return { name, value: old };
+  const props = ensureArrayProps(owner);
+  const i = props.findIndex((p) => p.name === String(name));
+  if (i < 0) throw new Error(`Property not found: ${name}`);
+  const [old] = props.splice(i, 1);
+  if (props.length === 0) delete owner.properties;
+  return { name: old.name, value: old.value };
 }
 
 function resolveTileset(map, spec) {
@@ -455,7 +474,9 @@ module.exports = {
   resolveOwner,
   resolveTileset,
   resolveObjectInLayer,
-  ensureObjectProps,
+  ensureArrayProps,
+  ensureObjectProps: ensureArrayProps,
+  toPropArray,
   listPropertyTypes,
   getPropertyType,
   addPropertyType,

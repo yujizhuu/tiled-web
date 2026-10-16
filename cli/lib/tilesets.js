@@ -60,6 +60,52 @@ function loadTsx(filePath) {
     if (ia.width) ts.imagewidth = Number(ia.width);
     if (ia.height) ts.imageheight = Number(ia.height);
   }
+  // Extras in Tiled 1.2 JSON shape (used by --embed): terrains, tiles[].terrain, wangsets
+  const tw = text.match(/<terraintypes\b[^>]*>([\s\S]*?)<\/terraintypes>/i);
+  if (tw) {
+    ts.terrains = [];
+    const re = /<terrain\b([^>]*?)\/?>/gi;
+    let m;
+    while ((m = re.exec(tw[1]))) {
+      const ta = parseAttrs(m[1]);
+      ts.terrains.push({ name: ta.name || '', tile: Number(ta.tile || -1) });
+    }
+  }
+  const tiles = [];
+  const tileRe = /<tile\b([^>]*?)(\/>|>)/gi;
+  let tm;
+  while ((tm = tileRe.exec(text))) {
+    const ta = parseAttrs(tm[1]);
+    if (ta.id == null || ta.terrain == null) continue;
+    tiles.push({ id: Number(ta.id), terrain: ta.terrain.split(',').map((v) => (v === '' ? -1 : Number(v))) });
+  }
+  if (tiles.length) ts.tiles = tiles;
+  const ww = text.match(/<wangsets\b[^>]*>([\s\S]*?)<\/wangsets>/i);
+  if (ww) {
+    ts.wangsets = [];
+    const re = /<wangset\b([^>]*)>([\s\S]*?)<\/wangset>/gi;
+    let m;
+    while ((m = re.exec(ww[1]))) {
+      const wa = parseAttrs(m[1]);
+      const ws = { name: wa.name || '', tile: Number(wa.tile || -1), cornercolors: [], edgecolors: [], wangtiles: [] };
+      const colRe = /<wang(corner|edge)color\b([^>]*?)\/?>/gi;
+      let c;
+      while ((c = colRe.exec(m[2]))) {
+        const ca = parseAttrs(c[2]);
+        ws[c[1] + 'colors'].push({ name: ca.name || '', color: ca.color || '', tile: Number(ca.tile || -1), probability: Number(ca.probability || 1) });
+      }
+      const wtRe = /<wangtile\b([^>]*?)\/?>/gi;
+      while ((c = wtRe.exec(m[2]))) {
+        const ca = parseAttrs(c[1]);
+        const id = Number(ca.wangid) >>> 0; // "0x..." parses as hex
+        // Tiled 1.2 JSON wangid: 8 ints [top, topright, right, bottomright, bottom, bottomleft, left, topleft] = nibbles 0..7
+        const wangid = [];
+        for (let i = 0; i < 8; i++) wangid.push((id >>> (4 * i)) & 0xf);
+        ws.wangtiles.push({ tileid: Number(ca.tileid), wangid, hflip: ca.hflip === 'true', vflip: ca.vflip === 'true', dflip: ca.dflip === 'true' });
+      }
+      ts.wangsets.push(ws);
+    }
+  }
   return ts;
 }
 
@@ -148,7 +194,14 @@ function addTileset(map, opts = {}, { mapPath } = {}) {
   // Resolve --source relative to map file when possible
   if (source) {
     const baseDir = mapPath ? path.dirname(path.resolve(mapPath)) : process.cwd();
-    const abs = path.isAbsolute(source) ? source : path.resolve(baseDir, source);
+    let abs = path.isAbsolute(source) ? source : path.resolve(baseDir, source);
+    // Fallback: path given relative to CWD → store it relative to the map file (Tiled stores
+    // tileset sources relative to the map, see TMX spec <tileset source>).
+    if (!fs.existsSync(abs) && !path.isAbsolute(source) && fs.existsSync(path.resolve(source))) {
+      abs = path.resolve(source);
+      source = path.relative(baseDir, abs).split(path.sep).join('/');
+      notes.push(`--source resolved from CWD; stored relative to map as ${source}`);
+    }
     if (fs.existsSync(abs) && /\.(tsx|xml)$/i.test(abs)) {
       loaded = loadTsx(abs);
       notes.push(`loaded external tileset ${abs}`);
@@ -177,20 +230,36 @@ function addTileset(map, opts = {}, { mapPath } = {}) {
   };
 
   if (source && !embed) {
+    // Tiled JSON/TMX external reference is exactly {firstgid, source} (doc: "source: only for
+    // external tilesets"); extra fields are ignored/dropped by Tiled. Keep the ref minimal.
+    for (const k of Object.keys(ts)) delete ts[k];
+    ts.firstgid = firstgid;
     ts.source = source;
-    // external ref: optional name is ok; do not embed image/tilecount in map
-    if (name) ts.name = name;
   } else {
     if (source && embed) {
       notes.push('embedded tsx contents into map (dropped external source)');
       if (loaded) {
-        if (loaded.image) image = image || loaded.image;
+        // image path in .tsx is relative to the .tsx; rebase to the map directory
+        if (loaded.image && !image) {
+          image = loaded._imagePath
+            ? path.relative(mapPath ? path.dirname(path.resolve(mapPath)) : process.cwd(), loaded._imagePath).split(path.sep).join('/')
+            : loaded.image;
+        }
+        for (const k of ['terrains', 'wangsets', 'tiles', 'properties']) if (loaded[k]) ts[k] = loaded[k];
         if (loaded.columns != null) ts.columns = loaded.columns;
         if (loaded.tilecount != null) ts.tilecount = loaded.tilecount;
         if (loaded.imagewidth) ts.imagewidth = loaded.imagewidth;
         if (loaded.imageheight) ts.imageheight = loaded.imageheight;
         if (loaded.margin != null) ts.margin = loaded.margin;
         if (loaded.spacing != null) ts.spacing = loaded.spacing;
+      }
+    }
+    if (image && !image.startsWith('data:') && !path.isAbsolute(image)) {
+      // Tiled stores image paths relative to the file that contains the tileset (the map here).
+      const mapDir = mapPath ? path.dirname(path.resolve(mapPath)) : process.cwd();
+      if (!fs.existsSync(path.resolve(mapDir, image)) && fs.existsSync(path.resolve(image))) {
+        image = path.relative(mapDir, path.resolve(image)).split(path.sep).join('/');
+        notes.push(`--image resolved from CWD; stored relative to map as ${image}`);
       }
     }
     if (image) ts.image = image;

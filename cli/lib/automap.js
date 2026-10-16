@@ -24,6 +24,16 @@ const path = require('path');
 const { tileAt, setTileAt, walkLayers, firstTileLayer } = require('./util');
 const { loadMap } = require('./load');
 
+// Tiled JSON properties are [{name,type,value}] (>=1.2) or legacy {name:value}
+function propsObj(props) {
+  if (Array.isArray(props)) {
+    const o = {};
+    for (const p of props) if (p && p.name != null) o[p.name] = p.value;
+    return o;
+  }
+  return props && typeof props === 'object' ? props : {};
+}
+
 function layerByName(map, name) {
   if (!name) return null;
   let found = null;
@@ -147,7 +157,7 @@ function compileRuleMap(ruleMap, fileName) {
     if (/^regions/i.test(nm)) continue;
     const inp = parseInputLayerName(nm);
     if (inp) {
-      const p = l.properties || {};
+      const p = propsObj(l.properties);
       const strictEmpty = !!(
         p.StrictEmpty === true ||
         p.StrictEmpty === 'true' ||
@@ -159,7 +169,7 @@ function compileRuleMap(ruleMap, fileName) {
     const out = parseOutputLayerName(nm);
     if (out) outputLayers.push({ layer: l, ...out });
   }
-  const props = ruleMap.properties || {};
+  const props = propsObj(ruleMap.properties);
   const deleteTiles =
     propTruthy(props, 'DeleteTiles', 'deleteTiles') ||
     String(props.DeleteTiles || '').toLowerCase() === 'yes';
@@ -214,7 +224,7 @@ function cellMatches(ruleMap, inputSpec, rx, ry, workLayer, wx, wy, workMap) {
   const workRaw = layerDataGet(workLayer, wx, wy, workMap) >>> 0;
 
   const isStrict = (spec) => {
-    const p = (spec.layer && spec.layer.properties) || {};
+    const p = propsObj(spec.layer && spec.layer.properties);
     return !!(
       spec.strictEmpty ||
       p.StrictEmpty === true ||

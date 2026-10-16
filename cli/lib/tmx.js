@@ -159,19 +159,40 @@ function parseElementBlocks(inner, tagNames) {
 }
 
 function parseProperties(content) {
-  const props = {};
+  // Tiled JSON (>=1.2) shape: [{name, type, value}]
+  const props = [];
   const re = /<property\b([^>]*)\/?>/gi;
   let m;
   while ((m = re.exec(content))) {
     const a = parseAttrs(m[1]);
     if (!a.name) continue;
-    let val = a.value != null ? a.value : '';
-    if ((a.type || 'string') === 'bool') val = val === 'true' || val === '1';
-    else if (a.type === 'int') val = Number(val) || 0;
-    else if (a.type === 'float') val = Number(val) || 0;
-    props[a.name] = val;
+    let val = a.value != null ? xmlUnescape(a.value) : '';
+    const type = a.type || 'string';
+    if (type === 'bool') val = val === 'true' || val === '1';
+    else if (type === 'int' || type === 'object') val = Number(val) || 0;
+    else if (type === 'float') val = Number(val) || 0;
+    const rec = { name: xmlUnescape(a.name), type, value: val };
+    if (a.propertytype) rec.propertytype = a.propertytype;
+    props.push(rec);
   }
   return props;
+}
+
+function xmlUnescape(v) {
+  return String(v)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&');
+}
+
+/** <properties> that is a direct child of `content` (not inside one of `childTags`). */
+function ownPropertiesBlock(content, childTags) {
+  const props = parseElementBlocks(content, ['properties']);
+  const kids = childTags.length ? parseElementBlocks(content, childTags) : [];
+  return props.find((b) => !kids.some((o) => o.fullStart < b.fullStart && o.fullEnd > b.fullEnd)) || null;
 }
 
 function parseObject(block) {
@@ -188,6 +209,7 @@ function parseObject(block) {
     visible: a.visible !== '0',
   };
   if (a.gid) rec.gid = Number(a.gid) >>> 0;
+  if (a.template) rec.template = a.template;
   if (/<ellipse\b/i.test(block.content)) rec.ellipse = true;
   if (/<point\b/i.test(block.content)) rec.point = true;
   const poly = block.content.match(/<polygon\b[^>]*points="([^"]*)"/i);
@@ -283,7 +305,7 @@ function parseLayers(inner, map) {
         visible: a.visible !== '0',
         objects,
       };
-      const propsBlock = parseElementBlocks(b.content, ['properties'])[0];
+      const propsBlock = ownPropertiesBlock(b.content, ['object']);
       if (propsBlock) layer.properties = parseProperties(propsBlock.content);
       out.push(layer);
     } else if (b.tag === 'imagelayer') {
@@ -323,9 +345,13 @@ function parseTilesets(inner, map) {
   );
   return top.map((b) => {
     const a = b.attrs;
+    if (a.source) return { firstgid: Number(a.firstgid || 1), source: a.source };
     const img = b.content.match(/<image\b([^>]*)\/?>/i);
     const imgAttrs = img ? parseAttrs(img[1]) : {};
+    const tsProps = ownPropertiesBlock(b.content, ['tile', 'wangsets', 'terraintypes']);
     return {
+      ...(tsProps ? { properties: parseProperties(tsProps.content) } : {}),
+      ...(imgAttrs.width ? { imagewidth: Number(imgAttrs.width), imageheight: Number(imgAttrs.height || 0) } : {}),
       firstgid: Number(a.firstgid || 1),
       name: a.name || '',
       tilewidth: Number(a.tilewidth || map.tilewidth),
@@ -352,9 +378,12 @@ function parseTmx(text) {
     tilewidth: Number(mapAttrs.tilewidth || 32),
     tileheight: Number(mapAttrs.tileheight || 32),
     infinite: mapAttrs.infinite === '1',
-    staggeraxis: mapAttrs.staggeraxis || 'y',
-    staggerindex: mapAttrs.staggerindex || 'odd',
-    hexsidelength: Number(mapAttrs.hexsidelength || 0),
+    // stagger/hex fields only exist for staggered/hexagonal maps (TMJ spec)
+    ...(mapAttrs.staggeraxis ? { staggeraxis: mapAttrs.staggeraxis } : {}),
+    ...(mapAttrs.staggerindex ? { staggerindex: mapAttrs.staggerindex } : {}),
+    ...(mapAttrs.hexsidelength ? { hexsidelength: Number(mapAttrs.hexsidelength) } : {}),
+    ...(mapAttrs.nextlayerid ? { nextlayerid: Number(mapAttrs.nextlayerid) } : {}),
+    ...(mapAttrs.nextobjectid ? { nextobjectid: Number(mapAttrs.nextobjectid) } : {}),
     layers: [],
     tilesets: [],
   };
@@ -374,6 +403,33 @@ function parseTmx(text) {
   return map;
 }
 
+const PROP_TYPES = new Set(['string', 'int', 'float', 'bool', 'color', 'file', 'object', 'class']);
+
+/** Serialize properties (array [{name,type,value}] or legacy {k:v}) as TMX <properties>. */
+function propsXml(props, indent) {
+  if (!props) return '';
+  const list = Array.isArray(props)
+    ? props
+    : Object.keys(props).map((k) => ({ name: k, value: props[k] }));
+  if (!list.length) return '';
+  const rows = list.map((p) => {
+    let type = p.type;
+    if (!type || !PROP_TYPES.has(type)) {
+      const v = p.value;
+      type = typeof v === 'boolean' ? 'bool' : typeof v === 'number' ? (Number.isInteger(v) ? 'int' : 'float') : 'string';
+    }
+    const pt = p.propertytype ? ` propertytype="${xmlEscape(p.propertytype)}"` : '';
+    const typeAttr = type === 'string' ? '' : ` type="${type}"`;
+    if (type === 'class') return `${indent}  <property name="${xmlEscape(p.name)}" type="class"${pt}/>`;
+    const v = p.value == null ? '' : typeof p.value === 'object' ? JSON.stringify(p.value) : String(p.value);
+    if (type === 'string' && v.includes('\n')) {
+      return `${indent}  <property name="${xmlEscape(p.name)}"${pt}>${xmlEscape(v)}</property>`;
+    }
+    return `${indent}  <property name="${xmlEscape(p.name)}"${typeAttr}${pt} value="${xmlEscape(v)}"/>`;
+  });
+  return `${indent}<properties>\n${rows.join('\n')}\n${indent}</properties>`;
+}
+
 function objectXml(o, indent = '    ') {
   const attrs = [
     `id="${o.id || 1}"`,
@@ -387,6 +443,7 @@ function objectXml(o, indent = '    ') {
   if (o.rotation) attrs.push(`rotation="${o.rotation}"`);
   if (o.visible === false) attrs.push('visible="0"');
   if (o.gid) attrs.push(`gid="${o.gid >>> 0}"`);
+  if (o.template) attrs.splice(1, 0, `template="${xmlEscape(o.template)}"`);
   let shape = '';
   if (o.ellipse) shape = '<ellipse/>';
   else if (o.point) shape = '<point/>';
@@ -395,8 +452,10 @@ function objectXml(o, indent = '    ') {
   } else if (o.polyline) {
     shape = `<polyline points="${o.polyline.map((pt) => `${pt.x},${pt.y}`).join(' ')}"/>`;
   }
-  const text = o.text !== undefined ? `<text>${xmlEscape(o.text)}</text>` : '';
-  const inner = shape + text;
+  const text =
+    o.text !== undefined ? `<text>${xmlEscape(typeof o.text === 'object' ? o.text.text || '' : o.text)}</text>` : '';
+  const props = propsXml(o.properties, indent + ' ');
+  const inner = (props ? `\n${props}\n${indent} ` : '') + shape + text;
   if (!inner) return `${indent}<object ${attrs.join(' ')}/>`;
   return `${indent}<object ${attrs.join(' ')}>${inner}</object>`;
 }
@@ -435,7 +494,8 @@ function layerToTmx(l, m, indent = '  ', opts = {}) {
     const open =
       `${indent}<layer id="${l.id || 1}" name="${xmlEscape(l.name || 'Layer')}" width="${w}" height="${h}"` +
       `${l.opacity != null && l.opacity !== 1 ? ` opacity="${l.opacity}"` : ''}` +
-      `${l.visible === false ? ' visible="0"' : ''}>`;
+      `${l.visible === false ? ' visible="0"' : ''}>` +
+      (l.properties && (l.properties.length || Object.keys(l.properties).length) ? '\n' + propsXml(l.properties, indent + '  ') : '');
     const isInfinite = !!(m.infinite || (l.chunks && l.chunks.length));
     if (isInfinite) {
       const chunks = Array.isArray(l.chunks) ? l.chunks : [];
@@ -487,7 +547,9 @@ function layerToTmx(l, m, indent = '  ', opts = {}) {
     const objects = (l.objects || []).map((o) => objectXml(o, indent + '  ')).join('\n');
     return (
       `${indent}<objectgroup id="${l.id || 1}" name="${xmlEscape(l.name || 'Object Layer')}"` +
-      `${l.visible === false ? ' visible="0"' : ''}>\n${objects}\n${indent}</objectgroup>`
+      `${l.visible === false ? ' visible="0"' : ''}>\n` +
+      (propsXml(l.properties, indent + '  ') ? propsXml(l.properties, indent + '  ') + '\n' : '') +
+      `${objects}\n${indent}</objectgroup>`
     );
   }
   if (l.type === 'imagelayer') {
@@ -504,10 +566,50 @@ function layerToTmx(l, m, indent = '  ', opts = {}) {
     return (
       `${indent}<group id="${l.id || 1}" name="${xmlEscape(l.name || 'Group')}"` +
       `${l.opacity != null && l.opacity !== 1 ? ` opacity="${l.opacity}"` : ''}` +
-      `${l.visible === false ? ' visible="0"' : ''}>\n${kids}\n${indent}</group>`
+      `${l.visible === false ? ' visible="0"' : ''}>\n` +
+      (propsXml(l.properties, indent + '  ') ? propsXml(l.properties, indent + '  ') + '\n' : '') +
+      `${kids}\n${indent}</group>`
     );
   }
   return '';
+}
+
+/** Embedded tileset extras (Tiled 1.2 TMX): <terraintypes>, <tile terrain>, <wangsets>. */
+function tilesetExtrasXml(t) {
+  let out = '';
+  if (Array.isArray(t.terrains) && t.terrains.length) {
+    out += '   <terraintypes>\n' +
+      t.terrains.map((r) => `    <terrain name="${xmlEscape(r.name || '')}" tile="${r.tile != null ? r.tile : -1}"/>`).join('\n') +
+      '\n   </terraintypes>\n';
+  }
+  if (Array.isArray(t.tiles)) {
+    for (const tile of t.tiles) {
+      if (!tile || tile.id == null) continue;
+      const terr = Array.isArray(tile.terrain) ? ` terrain="${tile.terrain.map((v) => (v < 0 ? '' : v)).join(',')}"` : '';
+      const tp = propsXml(tile.properties, '    ');
+      const type = tile.type ? ` type="${xmlEscape(tile.type)}"` : '';
+      out += tp ? `   <tile id="${tile.id}"${type}${terr}>\n${tp}\n   </tile>\n` : `   <tile id="${tile.id}"${type}${terr}/>\n`;
+    }
+  }
+  if (Array.isArray(t.wangsets) && t.wangsets.length) {
+    out += '   <wangsets>\n';
+    for (const ws of t.wangsets) {
+      out += `    <wangset name="${xmlEscape(ws.name || '')}" tile="${ws.tile != null ? ws.tile : -1}">\n`;
+      for (const kind of ['corner', 'edge']) {
+        for (const c of ws[kind + 'colors'] || []) {
+          out += `     <wang${kind}color name="${xmlEscape(c.name || '')}" color="${xmlEscape(c.color || '')}" tile="${c.tile != null ? c.tile : -1}" probability="${c.probability != null ? c.probability : 1}"/>\n`;
+        }
+      }
+      for (const wt of ws.wangtiles || []) {
+        let id = 0;
+        (wt.wangid || []).forEach((v, i) => { id |= (v & 0xf) << (4 * i); });
+        out += `     <wangtile tileid="${wt.tileid}" wangid="0x${(id >>> 0).toString(16)}"/>\n`;
+      }
+      out += '    </wangset>\n';
+    }
+    out += '   </wangsets>\n';
+  }
+  return out;
 }
 
 /**
@@ -532,6 +634,8 @@ function toTmx(map, opts = {}) {
     `tileheight="${m.tileheight}"`,
     `infinite="${m.infinite ? 1 : 0}"`,
   ];
+  if (m.nextlayerid) attrs.push(`nextlayerid="${m.nextlayerid}"`);
+  if (m.nextobjectid) attrs.push(`nextobjectid="${m.nextobjectid}"`);
   if (m.orientation === 'staggered' || m.orientation === 'hexagonal') {
     attrs.push(`staggeraxis="${xmlEscape(m.staggeraxis || 'y')}"`);
     attrs.push(`staggerindex="${xmlEscape(m.staggerindex || 'odd')}"`);
@@ -547,15 +651,22 @@ function toTmx(map, opts = {}) {
         ` tilewidth="${t.tilewidth || m.tilewidth}" tileheight="${t.tileheight || m.tileheight}"` +
         ` tilecount="${t.tilecount || 0}" columns="${t.columns || 0}"` +
         `${t.margin ? ` margin="${t.margin}"` : ''}${t.spacing ? ` spacing="${t.spacing}"` : ''}>` +
-        `<image source="${xmlEscape(t.image || '')}"/></tileset>`
+        `\n` +
+        (propsXml(t.properties, '   ') ? propsXml(t.properties, '   ') + '\n' : '') +
+        `   <image source="${xmlEscape(t.image || '')}"` +
+        `${t.imagewidth ? ` width="${t.imagewidth}"` : ''}${t.imageheight ? ` height="${t.imageheight}"` : ''}/>\n` +
+        tilesetExtrasXml(t) +
+        `  </tileset>`
       );
     })
     .join('\n');
+  const mapProps = propsXml(m.properties, '  ');
   const layerOpts = { encoding, compression };
   const layers = (m.layers || []).map((l) => layerToTmx(l, m, '  ', layerOpts)).filter(Boolean).join('\n');
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<map ${attrs.join(' ')}>\n` +
+    (mapProps ? mapProps + '\n' : '') +
     (tilesets ? tilesets + '\n' : '') +
     layers +
     `\n</map>\n`
