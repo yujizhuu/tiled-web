@@ -1,11 +1,13 @@
 'use strict';
 
 /**
- * Minimal TMX read/write for Phase 1 orthogonal maps.
- * Supports CSV-encoded tile data (and simple base64 uncompressed via Buffer).
- * No DOM — pure string/regex parsing suited for empty/simple maps.
+ * TMX read/write (agent CLI).
+ * Encodings: CSV, base64; compression: none, zlib, gzip (Node zlib; no zstd).
+ * Infinite maps: chunked <data> on export/load. Prefer TMJ for full fidelity.
+ * No DOM — pure string/regex parsing.
  */
 
+const zlib = require('zlib');
 const { xmlEscape, tileAt } = require('./util');
 
 function parseAttrs(tagInner) {
@@ -24,8 +26,26 @@ function decodeCsvGids(text) {
     .map((v) => (Number(v) >>> 0) || 0);
 }
 
-function decodeBase64Gids(text) {
-  const buf = Buffer.from(String(text).replace(/\s+/g, ''), 'base64');
+function decodeBase64Gids(text, compression) {
+  let buf = Buffer.from(String(text).replace(/\s+/g, ''), 'base64');
+  const comp = (compression || '').toLowerCase();
+  if (comp === 'zlib' || comp === 'deflate') {
+    try {
+      buf = zlib.inflateSync(buf);
+    } catch (err) {
+      throw new Error(`TMX zlib inflate failed: ${err.message}`);
+    }
+  } else if (comp === 'gzip') {
+    try {
+      buf = zlib.gunzipSync(buf);
+    } catch (err) {
+      throw new Error(`TMX gzip inflate failed: ${err.message}`);
+    }
+  } else if (comp && comp !== 'none') {
+    throw new Error(
+      `TMX compression "${comp}" not supported (use none|zlib|gzip; zstd is not supported in CLI)`
+    );
+  }
   if (buf.length % 4 !== 0) {
     throw new Error('TMX base64 tile data length is not a multiple of 4');
   }
@@ -36,14 +56,34 @@ function decodeBase64Gids(text) {
   return out;
 }
 
+function encodeGidsToCsv(gids) {
+  return (gids || []).map((g) => (g >>> 0)).join(',');
+}
+
+function encodeGidsToBase64(gids, compression) {
+  const arr = gids || [];
+  const raw = Buffer.alloc(arr.length * 4);
+  for (let i = 0; i < arr.length; i++) raw.writeUInt32LE(arr[i] >>> 0, i * 4);
+  const comp = (compression || '').toLowerCase();
+  let buf = raw;
+  if (comp === 'zlib' || comp === 'deflate') buf = zlib.deflateSync(raw);
+  else if (comp === 'gzip') buf = zlib.gzipSync(raw);
+  else if (comp && comp !== 'none') {
+    throw new Error(`TMX compression "${comp}" not supported on write (use none|zlib|gzip)`);
+  }
+  return buf.toString('base64');
+}
+
 function decodeLayerData(raw, encoding, compression) {
   const enc = (encoding || (String(raw).includes(',') ? 'csv' : 'base64')).toLowerCase();
   const comp = (compression || '').toLowerCase();
-  if (comp && comp !== 'none') {
-    throw new Error(`TMX compression "${comp}" not supported in Phase 1 CLI (use CSV or uncompressed base64)`);
+  if (enc === 'csv' || (!encoding && String(raw).includes(','))) {
+    if (comp && comp !== 'none') {
+      throw new Error('TMX CSV data cannot be compressed; use base64 + zlib/gzip');
+    }
+    return decodeCsvGids(raw);
   }
-  if (enc === 'csv' || (!encoding && String(raw).includes(','))) return decodeCsvGids(raw);
-  if (enc === 'base64') return decodeBase64Gids(raw);
+  if (enc === 'base64') return decodeBase64Gids(raw, comp);
   throw new Error(`Unsupported TMX data encoding: ${enc || '(empty)'}`);
 }
 
@@ -361,21 +401,85 @@ function objectXml(o, indent = '    ') {
   return `${indent}<object ${attrs.join(' ')}>${inner}</object>`;
 }
 
-function layerToTmx(l, m, indent = '  ') {
+function formatChunkBody(gids, encoding, compression, indentInner) {
+  const enc = (encoding || 'csv').toLowerCase();
+  if (enc === 'csv') {
+    return `${indentInner}${encodeGidsToCsv(gids)}`;
+  }
+  if (enc === 'base64') {
+    return `${indentInner}${encodeGidsToBase64(gids, compression)}`;
+  }
+  throw new Error(`Unsupported TMX export encoding: ${enc}`);
+}
+
+function dataAttrs(encoding, compression) {
+  const enc = (encoding || 'csv').toLowerCase();
+  let a = ` encoding="${enc}"`;
+  const comp = (compression || '').toLowerCase();
+  if (comp && comp !== 'none') a += ` compression="${comp}"`;
+  return a;
+}
+
+/**
+ * @param {object} l layer
+ * @param {object} m map
+ * @param {string} indent
+ * @param {{encoding?: string, compression?: string}} [opts]
+ */
+function layerToTmx(l, m, indent = '  ', opts = {}) {
   if (l.type === 'tilelayer') {
-    const rows = [];
-    const w = m.width;
-    const h = m.height;
-    for (let y = 0; y < h; y++) {
-      const row = [];
-      for (let x = 0; x < w; x++) row.push(tileAt(l, x, y, m) >>> 0);
-      rows.push(row.join(','));
-    }
-    return (
+    const w = Number(l.width != null ? l.width : m.width) || m.width;
+    const h = Number(l.height != null ? l.height : m.height) || m.height;
+    const encoding = opts.encoding || 'csv';
+    const compression = opts.compression || '';
+    const open =
       `${indent}<layer id="${l.id || 1}" name="${xmlEscape(l.name || 'Layer')}" width="${w}" height="${h}"` +
       `${l.opacity != null && l.opacity !== 1 ? ` opacity="${l.opacity}"` : ''}` +
-      `${l.visible === false ? ' visible="0"' : ''}>\n` +
-      `${indent}  <data encoding="csv">\n${rows.join(',\n')}\n${indent}  </data>\n` +
+      `${l.visible === false ? ' visible="0"' : ''}>`;
+    const isInfinite = !!(m.infinite || (l.chunks && l.chunks.length));
+    if (isInfinite) {
+      const chunks = Array.isArray(l.chunks) ? l.chunks : [];
+      const chunkXml = chunks
+        .map((c) => {
+          const body = formatChunkBody(c.data || [], encoding, compression, indent + '      ');
+          return (
+            `${indent}    <chunk x="${c.x || 0}" y="${c.y || 0}"` +
+            ` width="${c.width || 16}" height="${c.height || 16}">\n` +
+            `${body}\n` +
+            `${indent}    </chunk>`
+          );
+        })
+        .join('\n');
+      return (
+        `${open}\n` +
+        `${indent}  <data${dataAttrs(encoding, compression)}>\n` +
+        (chunkXml ? chunkXml + '\n' : '') +
+        `${indent}  </data>\n` +
+        `${indent}</layer>`
+      );
+    }
+    // Finite maps: CSV by default; base64 (+ zlib/gzip) when requested
+    if ((encoding || 'csv').toLowerCase() === 'csv') {
+      const rows = [];
+      for (let y = 0; y < h; y++) {
+        const row = [];
+        for (let x = 0; x < w; x++) row.push(tileAt(l, x, y, m) >>> 0);
+        rows.push(row.join(','));
+      }
+      return (
+        `${open}\n` +
+        `${indent}  <data encoding="csv">\n${rows.join(',\n')}\n${indent}  </data>\n` +
+        `${indent}</layer>`
+      );
+    }
+    const flat = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) flat.push(tileAt(l, x, y, m) >>> 0);
+    }
+    const body = formatChunkBody(flat, encoding, compression, indent + '    ');
+    return (
+      `${open}\n` +
+      `${indent}  <data${dataAttrs(encoding, compression)}>\n${body}\n${indent}  </data>\n` +
       `${indent}</layer>`
     );
   }
@@ -396,7 +500,7 @@ function layerToTmx(l, m, indent = '  ') {
     );
   }
   if (l.type === 'group') {
-    const kids = (l.layers || []).map((c) => layerToTmx(c, m, indent + '  ')).join('\n');
+    const kids = (l.layers || []).map((c) => layerToTmx(c, m, indent + '  ', opts)).join('\n');
     return (
       `${indent}<group id="${l.id || 1}" name="${xmlEscape(l.name || 'Group')}"` +
       `${l.opacity != null && l.opacity !== 1 ? ` opacity="${l.opacity}"` : ''}` +
@@ -406,8 +510,17 @@ function layerToTmx(l, m, indent = '  ') {
   return '';
 }
 
-function toTmx(map) {
+/**
+ * Serialize map to TMX XML.
+ * opts: { encoding: 'csv'|'base64', compression: ''|'zlib'|'gzip' }
+ * Infinite maps always emit <chunk> children (CSV by default; base64+zlib supported).
+ * Finite maps default to CSV; pass encoding/compression for base64 zlib round-trips.
+ * TMJ remains the preferred agent format for full fidelity.
+ */
+function toTmx(map, opts = {}) {
   const m = map;
+  const encoding = opts.encoding || 'csv';
+  const compression = opts.compression || '';
   const attrs = [
     `version="1.2"`,
     `tiledversion="${xmlEscape(m.tiledversion || '1.2.4')}"`,
@@ -438,7 +551,8 @@ function toTmx(map) {
       );
     })
     .join('\n');
-  const layers = (m.layers || []).map((l) => layerToTmx(l, m)).filter(Boolean).join('\n');
+  const layerOpts = { encoding, compression };
+  const layers = (m.layers || []).map((l) => layerToTmx(l, m, '  ', layerOpts)).filter(Boolean).join('\n');
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<map ${attrs.join(' ')}>\n` +
@@ -448,4 +562,10 @@ function toTmx(map) {
   );
 }
 
-module.exports = { parseTmx, toTmx };
+module.exports = {
+  parseTmx,
+  toTmx,
+  decodeLayerData,
+  encodeGidsToBase64,
+  encodeGidsToCsv,
+};

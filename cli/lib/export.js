@@ -27,17 +27,33 @@ function exportCsv(map, layer) {
  * @param {object} map
  * @param {'tmj'|'tmx'|'csv'} format
  * @param {string} outPath
+ * @param {{encoding?: string, compression?: string}} [opts] TMX-only encoding options
  */
-function exportMap(map, format, outPath) {
+function exportMap(map, format, outPath, opts = {}) {
   const fmt = String(format || '').toLowerCase();
   let body;
   if (fmt === 'tmj' || fmt === 'json') body = exportTmj(map);
-  else if (fmt === 'tmx') body = toTmx(map);
-  else if (fmt === 'csv') body = exportCsv(map);
+  else if (fmt === 'tmx') {
+    body = toTmx(map, {
+      encoding: opts.encoding || 'csv',
+      compression: opts.compression || '',
+    });
+  } else if (fmt === 'csv') body = exportCsv(map);
   else throw new Error(`Unknown export format: ${format} (use tmj|tmx|csv)`);
 
   writeText(outPath, body);
-  return { format: fmt === 'json' ? 'tmj' : fmt, path: path.resolve(outPath), bytes: Buffer.byteLength(body, 'utf8') };
+  return {
+    format: fmt === 'json' ? 'tmj' : fmt,
+    path: path.resolve(outPath),
+    bytes: Buffer.byteLength(body, 'utf8'),
+    ...(fmt === 'tmx'
+      ? {
+          encoding: opts.encoding || 'csv',
+          compression: opts.compression || null,
+          infiniteChunks: !!(map.infinite),
+        }
+      : {}),
+  };
 }
 
 module.exports = { exportMap, exportTmj, exportCsv };

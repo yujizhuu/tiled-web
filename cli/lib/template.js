@@ -4,6 +4,7 @@
  * Object templates (.tx XML / .tj|.json JSON) — load info + apply instance to object layer.
  */
 
+const fs = require('fs');
 const path = require('path');
 const { readText, extOf, xmlEscape } = require('./util');
 const { nextObjectId, resolveObjectLayer, summarizeObject } = require('./objects');
@@ -337,9 +338,75 @@ function applyTemplate(map, {
   return result;
 }
 
+
+/**
+ * Scan a directory for object templates (.tx / .tj / .json that parse as templates).
+ * Non-template .json files are skipped silently.
+ * @param {string} dir
+ * @param {{recursive?: boolean}} [opts]
+ * @returns {Array<{path,name,type,size,width,height,format,hasTileset}>}
+ */
+function indexTemplates(dir, opts = {}) {
+  const recursive = opts.recursive !== false;
+  const abs = path.resolve(dir);
+  let st;
+  try {
+    st = fs.statSync(abs);
+  } catch (err) {
+    throw new Error(`Cannot read template directory: ${dir} (${err.message})`);
+  }
+  if (!st.isDirectory()) throw new Error(`Not a directory: ${dir}`);
+
+  const results = [];
+  function walk(d) {
+    let entries;
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch (err) {
+      throw new Error(`Cannot list directory: ${d} (${err.message})`);
+    }
+    for (const ent of entries) {
+      if (ent.name.startsWith('.')) continue;
+      const p = path.join(d, ent.name);
+      if (ent.isDirectory()) {
+        if (recursive && ent.name !== 'node_modules') walk(p);
+        continue;
+      }
+      const ext = path.extname(ent.name).toLowerCase();
+      if (ext !== '.tx' && ext !== '.tj' && ext !== '.json') continue;
+      let fileStat;
+      try {
+        fileStat = fs.statSync(p);
+      } catch {
+        continue;
+      }
+      try {
+        const tpl = loadTemplate(p);
+        const o = tpl.object || {};
+        results.push({
+          path: p,
+          name: o.name || path.basename(ent.name, ext),
+          type: o.type || o.class || '',
+          size: fileStat.size,
+          width: Number(o.width) || 0,
+          height: Number(o.height) || 0,
+          format: tpl.format,
+          hasTileset: !!tpl.tileset,
+        });
+      } catch {
+        // skip non-template JSON / broken files
+      }
+    }
+  }
+  walk(abs);
+  results.sort((a, b) => a.path.localeCompare(b.path));
+  return results;
+}
+
 module.exports = {
   loadTemplate,
   templateInfo,
+  indexTemplates,
   applyTemplate,
   mergeTemplateTileset,
   nextFirstGid,

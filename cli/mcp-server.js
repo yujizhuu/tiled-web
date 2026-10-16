@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web MCP server (stdio, JSON-RPC 2.0) — Phase 6
+ * tiled-web MCP server (stdio, JSON-RPC 2.0) — Phase 7
  * Zero npm deps. Spawns the sibling CLI binary so tool behavior matches CLI.
  *
  * Cursor / Claude Desktop example (~/.cursor/mcp.json or Claude config):
@@ -233,6 +233,8 @@ const TOOLS = [
         tileset: { type: ['string', 'number'] },
         values: { type: 'string', description: 'For types add enum: comma list or JSON array' },
         members: { type: 'string', description: 'For types add class: JSON members array' },
+        useAs: { type: 'string', description: 'For types add: comma list e.g. property,object,tile' },
+        noExpand: { type: 'boolean', description: 'For types get: skip membersExpanded' },
         output: { type: 'string' },
       },
       required: ['subcommand', 'map'],
@@ -245,6 +247,8 @@ const TOOLS = [
         if (a.type != null) args.push('--type', String(a.type));
         if (a.values != null) args.push('--values', String(a.values));
         if (a.members != null) args.push('--members', String(a.members));
+        if (a.useAs != null) args.push('--use-as', String(a.useAs));
+        if (a.noExpand) args.push('--no-expand');
         if (a.output) args.push('-o', a.output);
         return args;
       }
@@ -292,17 +296,19 @@ const TOOLS = [
   },
   {
     name: 'tiled_template',
-    description: 'Template info|apply (apply auto-merges tilesets)',
+    description: 'Template info|index|apply (apply auto-merges tilesets; index scans a directory)',
     inputSchema: {
       type: 'object',
       properties: {
-        subcommand: { type: 'string', enum: ['info', 'apply'] },
+        subcommand: { type: 'string', enum: ['info', 'index', 'apply'] },
         map: { type: 'string' },
         template: { type: 'string' },
+        dir: { type: 'string' },
         layer: { type: ['string', 'number'] },
         x: { type: 'number' },
         y: { type: 'number' },
         createLayer: { type: 'boolean' },
+        noRecursive: { type: 'boolean' },
         output: { type: 'string' },
       },
       required: ['subcommand'],
@@ -311,6 +317,12 @@ const TOOLS = [
       if (a.subcommand === 'info') {
         if (!a.template) throw new Error('template info requires template path');
         return ['template', 'info', a.template];
+      }
+      if (a.subcommand === 'index') {
+        if (!a.dir) throw new Error('template index requires dir');
+        const args = ['template', 'index', a.dir];
+        if (a.noRecursive) args.push('--no-recursive');
+        return args;
       }
       const args = ['template', 'apply', a.map, '--template', a.template, '--x', String(a.x), '--y', String(a.y)];
       if (a.layer != null) args.push('--layer', String(a.layer));
@@ -402,17 +414,24 @@ const TOOLS = [
   },
   {
     name: 'tiled_export',
-    description: 'Export map to tmj|tmx|csv',
+    description: 'Export map to tmj|tmx|csv (TMX: optional encoding/compression; infinite emits chunks)',
     inputSchema: {
       type: 'object',
       properties: {
         map: { type: 'string' },
         format: { type: 'string', enum: ['tmj', 'tmx', 'csv'] },
         output: { type: 'string' },
+        encoding: { type: 'string', enum: ['csv', 'base64'] },
+        compression: { type: 'string', enum: ['zlib', 'gzip'] },
       },
       required: ['map', 'format', 'output'],
     },
-    buildArgs: (a) => ['export', a.map, '-f', a.format, '-o', a.output],
+    buildArgs: (a) => {
+      const args = ['export', a.map, '-f', a.format, '-o', a.output];
+      if (a.encoding) args.push('--encoding', a.encoding);
+      if (a.compression) args.push('--compression', a.compression);
+      return args;
+    },
   },
   {
     name: 'tiled_coord',

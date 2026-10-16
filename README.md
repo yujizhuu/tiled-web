@@ -20,9 +20,11 @@ cd tiled-web
 
 macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
-## CLI（Phase 6 · Agent 用）
+## CLI（Phase 7 · Agent 目标已达成）
 
-无界面时可用命令行创建 / 查看 / 写瓦片 / 印章 / 模板 / 无限地图 chunks / 管图层与对象 / 自定义属性 / 图块集 / 自动地图 / World / 批量替换 GID / 坐标换算 / Wang·地形列举 / 导出地图。另提供 **零依赖 MCP stdio 包装**（`cli/mcp-server.js`）。需要 **Node.js 18+**。零 npm 依赖。
+**Agent CLI 目标已达成（0.7.0）。** 无界面时可创建 / 查看 / 写瓦片 / 印章 / 模板（含目录索引）/ 无限地图 chunks / 管图层与对象 / 自定义属性与 `propertytypes`（`useAs` + 嵌套 class 展开）/ 图块集 / 自动地图 / World / 批量替换 GID / 坐标换算 / Wang·地形列举 / 导出 TMJ·TMX·CSV（TMX 支持无限 chunks 与 base64+zlib）。另提供 **零依赖 MCP stdio 包装**（`cli/mcp-server.js`）。需要 **Node.js 18+**。零 npm 依赖。
+
+剩余未做能力均为 **GUI 专属**（实时自动地图、规则可视化编辑、Wang/地形笔刷、撤销栈等），见 [`tool/`](tool/)。
 
 ### 安装
 
@@ -55,28 +57,29 @@ node cli/mcp-server.js   # stdio JSON-RPC，Content-Length 帧
 }
 ```
 
-暴露的 tools 与 CLI 对齐：`tiled_version`、`tiled_info`、`tiled_new`、`tiled_set_tile`、`tiled_fill`、`tiled_get_layer`、`tiled_layer`、`tiled_object`、`tiled_prop`、`tiled_stamp`、`tiled_template`、`tiled_automap`、`tiled_world`、`tiled_replace_gid`、`tiled_export`、`tiled_coord`、`tiled_wang`、`tiled_terrain`。
+暴露的 tools 与 CLI 对齐：`tiled_version`、`tiled_info`、`tiled_new`、`tiled_set_tile`、`tiled_fill`、`tiled_get_layer`、`tiled_layer`、`tiled_object`、`tiled_prop`、`tiled_stamp`、`tiled_template`（含 index）、`tiled_automap`、`tiled_world`、`tiled_replace_gid`、`tiled_export`（TMX encoding/compression）、`tiled_coord`、`tiled_wang`、`tiled_terrain`。
 
 ### 命令
 
 | 命令 | 作用 |
 |------|------|
-| `tiled-web version` | 版本与阶段（0.6.0 / Phase 6） |
+| `tiled-web version` | 版本与阶段（0.7.0 / Phase 7 · agent 目标达成） |
 | `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal\|isometric\|hexagonal\|staggered] [--staggeraxis y\|x] [--staggerindex odd\|even] [--hexsidelength N] -o map.tmj` | 新建空瓦片层地图 |
 | `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
-| `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID；无限地图 TMJ 保留 chunks |
+| `tiled-web export map.tmj -f tmj\|tmx\|csv -o out [--encoding csv\|base64] [--compression zlib\|gzip]` | 导出；CSV 为第一瓦片层 GID；无限地图 TMJ/TMX 保留 chunks；TMX 可选 base64+zlib（无 zstd） |
 | `tiled-web set-tile <map> --x X --y Y --gid GID [--layer name\|index] [--flip-h] [--flip-v] [--flip-d] [-o out]` | 写单个瓦片 GID（可带翻转；无限地图可负坐标） |
 | `tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer ...] [--flip-h\|v\|d] [-o out]` | 矩形填充 GID |
 | `tiled-web get-layer <map> [--layer name\|index] [--format json\|csv] [-o out]` | 读出单层 GID（无限地图返回 chunk 包围盒） |
 | `tiled-web stamp copy <map> --layer --x --y --width --height -o stamp.json` | 复制矩形区域 GID 为印章 |
 | `tiled-web stamp paste <map> --layer --x --y --stamp stamp.json [-o out]` | 粘贴印章（有限地图裁剪边界；保留翻转 GID） |
 | `tiled-web template info <file.tx\|file.tj\|json>` | 查看对象模板 |
+| `tiled-web template index <dir> [--no-recursive]` | 扫描目录下 `.tx`/`.tj`/JSON 模板，输出 JSON 列表（path/name/type/size） |
 | `tiled-web template apply <map> --layer --template --x --y [--create-layer] [-o out]` | 放置模板实例；**自动并入缺失图块集**（安全 next firstgid + GID 重映射） |
 | `tiled-web layer list\|add\|remove\|rename …` | 图层管理 |
 | `tiled-web tileset add\|list …` | 图块集 |
 | `tiled-web object list\|add\|remove\|update …` | 对象层 |
 | `tiled-web prop list\|get\|set\|remove …` | 自定义属性 |
-| `tiled-web prop types list\|get\|add\|remove …` | 地图 `propertytypes`（enum/class 可写） |
+| `tiled-web prop types list\|get\|add\|remove …` | 地图 `propertytypes`（enum/class；`--use-as`；get 展开嵌套 class `membersExpanded`） |
 | `tiled-web coord tile-to-pixel\|pixel-to-tile [<map>] --x --y [--orientation …] [--tilewidth …] …` | 像素 ↔ 瓦片（正交 / 等距 / 六角 / staggered） |
 | `tiled-web wang list <map>` | 列举图块集 wangsets（只读数据） |
 | `tiled-web terrain list <map>` | 列举图块集 terraintypes（只读数据） |
@@ -115,6 +118,12 @@ node bin/tiled-web.js stamp paste /tmp/level.tmj --layer Ground --x 8 --y 8 --st
 node bin/tiled-web.js new --width 64 --height 64 --infinite -o /tmp/inf.tmj
 node bin/tiled-web.js set-tile /tmp/inf.tmj --x 100 --y -5 --gid 1
 node bin/tiled-web.js export /tmp/inf.tmj -f tmj -o /tmp/inf_out.tmj
+
+# Phase 7 — template index / prop types expand / TMX infinite+zlib
+node bin/tiled-web.js template index fixtures/templates
+node bin/tiled-web.js prop types add /tmp/level.tmj --name Stats --type class --members '[{"name":"hp","type":"int","value":10}]' --use-as property,object
+node bin/tiled-web.js export /tmp/inf.tmj -f tmx -o /tmp/inf.tmx
+node bin/tiled-web.js export /tmp/level.tmj -f tmx --encoding base64 --compression zlib -o /tmp/level_z.tmx
 ```
 
 自检：
@@ -130,19 +139,22 @@ cd cli && ./test_smoke.sh
 - **Phase 3：** 对象层、属性、更完整的图块集引用（`.tsx` / PNG 尺寸 / GID 翻转）✅
 - **Phase 4：** `automap`（规则子集）、`world *`、`replace-gid` ✅
 - **Phase 5：** `stamp copy|paste`、`template info|apply`、无限地图 chunks、`automap --radius`、`prop types` list/get ✅
-- **Phase 6（当前）：** MCP stdio 包装、`coord` 像素↔瓦片、`prop types add|remove`、模板图块集自动并入、`wang list` / `terrain list`、无限 TMJ 导出确认 ✅
+- **Phase 6：** MCP stdio 包装、`coord` 像素↔瓦片、`prop types add|remove`、模板图块集自动并入、`wang list` / `terrain list`、无限 TMJ 导出确认 ✅
+- **Phase 7（当前 · agent 目标达成）：** `template index`、`prop types` `useAs` + 嵌套 class `membersExpanded`、TMX 无限 `<chunk>` + base64 zlib/gzip（Node zlib；无 zstd）✅
 
 #### Automap CLI 子集（相对网页）
 
 已实现：`rules.txt` / `rules.json` / 目录 / 单规则图；`Regions` + `Input_*` / `InputNot_*` / `Output_*` 瓦片层；`DeleteTiles` / `MatchOutsideMap` / `StrictEmpty`；对象层 `Output_*` 克隆；`--radius N --x/--y` 扫描裁剪（规则图 `AutomappingRadius` 在给了中心点时也会参与）。
 
-#### Phase 6 之后仍弱 / 未做（诚实清单 · 基本均为 GUI）
+#### 仍为 GUI 专属（诚实清单 · CLI 不再追）
+
+Agent 侧数据读写与批处理已齐；下列留在网页 [`tool/`](tool/)：
 
 - 实时绘制自动地图、规则可视化编辑器
-- Wang / 地形**笔刷交互**对等（CLI 已有 `wang list` / `terrain list` / `replace-gid` 等数据批处理；无 `wang apply-corner` 笔刷）
+- Wang / 地形**笔刷交互**（CLI 已有 `wang list` / `terrain list` / `replace-gid`；无笔刷）
 - 撤销栈 / 历史
-- 模板目录批量索引、`propertytypes` 继承展开到对象默认属性
-- TMX 无限 chunks / 压缩编码仍有限（无限地图请用 TMJ）
+- 图块→对象实例属性默认值的 GUI 灰色继承面板（CLI `prop types get` 已展开嵌套 class 成员默认值；不自动写入对象实例）
+- TMX `zstd`（CLI 支持 CSV / base64 ± zlib|gzip；无限地图 TMJ 仍最稳）
 
 ## 功能概览（相对 Tiled 1.2.4 · 网页）
 
@@ -178,7 +190,7 @@ tiled-web/
 ├── LICENSE           # AGPL-3.0
 ├── NOTICE
 ├── README.md
-├── cli/              # Node CLI + MCP（Phase 6）
+├── cli/              # Node CLI + MCP（Phase 7 · agent 目标达成）
 │   ├── bin/tiled-web.js
 │   ├── mcp-server.js   # 零依赖 MCP stdio
 │   ├── lib/            # create/load/coord/wang/layers/objects/props/…
@@ -187,7 +199,7 @@ tiled-web/
 │   ├── fixtures/wang/
 │   ├── package.json
 │   ├── test_smoke.sh
-│   ├── test_phase4.sh … test_phase6.sh
+│   ├── test_phase4.sh … test_phase7.sh
 │   └── test_mcp_stdio.py
 └── tool/             # 静态站点根目录（http.server 从这个目录起）
     ├── index.html

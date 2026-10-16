@@ -164,8 +164,144 @@ function resolveOwner(map, flags) {
 
 /**
  * Map-level property type definitions (Tiled propertytypes / object types subset).
- * Stored as map.propertytypes = [{ name, type, values?, members?, ... }].
+ * Stored as map.propertytypes = [{ name, type, values?, members?, useAs?, ... }].
+ *
+ * Inheritance model (matches Tiled, not OO extends):
+ * - Classes do NOT extend other classes.
+ * - A class member with type "class" + propertyType "<OtherClass>" nests that class;
+ *   `get` expands nested members one level deep (and recursively up to depth 8).
+ * - `useAs` is the modern Tiled array: property|map|layer|object|tile|tileset|wangcolor|wangset|project.
+ *   Legacy useAsPropertyValue / useAsMapType / … flags are also read/written for compatibility.
+ * Limits: no tile→object instance default merging (GUI); no zstd; color/drawFill optional passthrough.
  */
+
+const USE_AS_LEGACY = {
+  property: 'useAsPropertyValue',
+  map: 'useAsMapType',
+  layer: 'useAsLayerType',
+  object: 'useAsObjectType',
+  tile: 'useAsTileType',
+};
+
+const USE_AS_ALL = [
+  'property',
+  'map',
+  'layer',
+  'object',
+  'tile',
+  'tileset',
+  'wangcolor',
+  'wangset',
+  'project',
+];
+
+function ensurePropertyTypesArray(map) {
+  if (!Array.isArray(map.propertytypes)) {
+    if (Array.isArray(map.propertyTypes)) {
+      map.propertytypes = map.propertyTypes;
+      delete map.propertyTypes;
+    } else {
+      map.propertytypes = [];
+    }
+  } else if (map.propertyTypes && map.propertyTypes !== map.propertytypes) {
+    delete map.propertyTypes;
+  }
+  return map.propertytypes;
+}
+
+function findRawPropertyType(map, name) {
+  const list = map.propertytypes || map.propertyTypes || [];
+  if (!Array.isArray(list)) return null;
+  return list.find((t) => t && t.name === String(name)) || null;
+}
+
+function useAsFromRecord(t) {
+  if (Array.isArray(t.useAs)) return t.useAs.map(String);
+  const out = [];
+  for (const [key, flag] of Object.entries(USE_AS_LEGACY)) {
+    if (t[flag] === true) out.push(key);
+  }
+  return out;
+}
+
+function applyUseAsToRecord(rec, useAsList) {
+  const list = (useAsList || []).map(String);
+  rec.useAs = list;
+  for (const [key, flag] of Object.entries(USE_AS_LEGACY)) {
+    rec[flag] = list.includes(key);
+  }
+}
+
+function parseUseAsFlag(opts) {
+  let useAs = opts['use-as'] != null ? opts['use-as'] : opts.useAs;
+  if (useAs == null || useAs === true) {
+    // Collect legacy boolean flags if any were passed
+    const collected = [];
+    for (const [key, flag] of Object.entries(USE_AS_LEGACY)) {
+      const kebab = flag.replace(/([A-Z])/g, (m) => '-' + m.toLowerCase());
+      const raw = opts[flag] != null ? opts[flag] : opts[kebab];
+      if (raw === true || raw === 'true' || raw === '1') collected.push(key);
+    }
+    return collected.length ? collected : null;
+  }
+  if (typeof useAs === 'string') {
+    const s = useAs.trim();
+    if (s.startsWith('[')) {
+      try {
+        useAs = JSON.parse(s);
+      } catch (err) {
+        throw new Error(`Invalid --use-as JSON: ${err.message}`);
+      }
+    } else {
+      useAs = s.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(useAs)) throw new Error('--use-as must be a list (comma-separated or JSON array)');
+  for (const u of useAs) {
+    if (!USE_AS_ALL.includes(String(u))) {
+      throw new Error(
+        `Unknown useAs value: ${u} (use ${USE_AS_ALL.join('|')})`
+      );
+    }
+  }
+  return useAs.map(String);
+}
+
+/**
+ * Expand nested class members (type:"class" + propertyType) into membersExpanded + merged value defaults.
+ */
+function expandClassMembers(map, typeRec, { depth = 0, seen = null } = {}) {
+  const members = Array.isArray(typeRec && typeRec.members) ? typeRec.members : [];
+  if (!members.length) return [];
+  if (depth > 8) return members.map((m) => ({ ...m }));
+  const seenSet = seen || new Set();
+  const typeName = typeRec && typeRec.name;
+  if (typeName) {
+    if (seenSet.has(typeName)) return members.map((m) => ({ ...m }));
+    seenSet.add(typeName);
+  }
+  return members.map((m) => {
+    const out = { ...m };
+    const propTypeName = m.propertyType || m.propertytype;
+    if (String(m.type || '').toLowerCase() === 'class' && propTypeName) {
+      const nested = findRawPropertyType(map, propTypeName);
+      if (nested && (nested.type || nested.kind) === 'class') {
+        const childSeen = new Set(seenSet);
+        const expanded = expandClassMembers(map, nested, { depth: depth + 1, seen: childSeen });
+        out.membersExpanded = expanded;
+        const base = {};
+        for (const nm of expanded) {
+          if (nm && nm.name != null) base[nm.name] = nm.value;
+        }
+        const own = m.value && typeof m.value === 'object' && !Array.isArray(m.value) ? m.value : {};
+        out.value = { ...base, ...own };
+        out.propertyType = String(propTypeName);
+      }
+    }
+    return out;
+  });
+}
+
 function listPropertyTypes(map) {
   const list = map.propertytypes || map.propertyTypes || [];
   if (!Array.isArray(list)) return [];
@@ -176,47 +312,42 @@ function listPropertyTypes(map) {
     values: t.values || undefined,
     members: t.members || undefined,
     storageType: t.storageType || undefined,
+    useAs: useAsFromRecord(t),
     useAsPropertyValue: t.useAsPropertyValue,
     useAsMapType: t.useAsMapType,
     useAsLayerType: t.useAsLayerType,
     useAsObjectType: t.useAsObjectType,
     useAsTileType: t.useAsTileType,
+    color: t.color,
+    drawFill: t.drawFill,
   }));
 }
 
-function getPropertyType(map, name) {
+function getPropertyType(map, name, { expand = true } = {}) {
   if (!name || name === true) throw new Error('prop types get requires --name <TypeName>');
-  const list = map.propertytypes || map.propertyTypes || [];
-  if (!Array.isArray(list)) throw new Error('Map has no propertytypes');
-  const found = list.find((t) => t.name === String(name));
+  const found = findRawPropertyType(map, name);
   if (!found) throw new Error(`Property type not found: ${name}`);
-  return {
+  const type = found.type || found.kind || 'string';
+  const rec = {
     name: found.name,
-    type: found.type || found.kind || 'string',
+    type,
     values: found.values,
     members: found.members,
     storageType: found.storageType,
+    useAs: useAsFromRecord(found),
+    color: found.color,
+    drawFill: found.drawFill,
     raw: found,
   };
+  if (expand && type === 'class') {
+    rec.membersExpanded = expandClassMembers(map, found);
+  }
+  return rec;
 }
-
-module.exports = {
-  toObjectMap,
-  listProps,
-  getProp,
-  setProp,
-  removeProp,
-  resolveOwner,
-  resolveTileset,
-  resolveObjectInLayer,
-  ensureObjectProps,
-  listPropertyTypes,
-  getPropertyType,
-};
 
 /**
  * Add a property type definition to map.propertytypes.
- * opts: { name, type, values?, members?, storageType?, useAs* }
+ * opts: { name, type, values?, members?, storageType?, useAs? / use-as?, useAs* , color?, drawFill? }
  */
 function addPropertyType(map, opts = {}) {
   const name = opts.name != null && opts.name !== true ? String(opts.name) : '';
@@ -226,13 +357,8 @@ function addPropertyType(map, opts = {}) {
     throw new Error(`Unknown property type --type: ${opts.type} (use enum|class|string|bool|int|float|…)`);
   }
 
-  if (!Array.isArray(map.propertytypes)) map.propertytypes = [];
-  // Prefer lowercase propertytypes; drop camelCase twin if present
-  if (map.propertyTypes && map.propertyTypes !== map.propertytypes) {
-    delete map.propertyTypes;
-  }
-
-  if (map.propertytypes.some((t) => t && t.name === name)) {
+  const list = ensurePropertyTypesArray(map);
+  if (list.some((t) => t && t.name === name)) {
     throw new Error(`Property type already exists: ${name}`);
   }
 
@@ -266,6 +392,9 @@ function addPropertyType(map, opts = {}) {
     } else {
       rec.storageType = 'string';
     }
+    if (opts['values-as-flags'] === true || opts.valuesAsFlags === true || opts['values-as-flags'] === 'true') {
+      rec.valuesAsFlags = true;
+    }
   }
 
   if (type === 'class') {
@@ -283,24 +412,23 @@ function addPropertyType(map, opts = {}) {
     } else {
       rec.members = [];
     }
+    if (opts.color != null && opts.color !== true) rec.color = String(opts.color);
+    if (opts['draw-fill'] === true || opts.drawFill === true || opts['draw-fill'] === 'true') {
+      rec.drawFill = true;
+    } else if (opts['draw-fill'] === false || opts.drawFill === false || opts['draw-fill'] === 'false') {
+      rec.drawFill = false;
+    }
   }
 
-  // Optional useAs* flags
-  const useFlags = [
-    'useAsPropertyValue',
-    'useAsMapType',
-    'useAsLayerType',
-    'useAsObjectType',
-    'useAsTileType',
-  ];
-  for (const f of useFlags) {
-    const kebab = f.replace(/([A-Z])/g, (m) => '-' + m.toLowerCase());
-    const raw = opts[f] != null ? opts[f] : opts[kebab];
-    if (raw === true || raw === 'true' || raw === '1') rec[f] = true;
-    else if (raw === false || raw === 'false' || raw === '0') rec[f] = false;
+  const useAs = parseUseAsFlag(opts);
+  if (useAs) {
+    applyUseAsToRecord(rec, useAs);
+  } else if (type === 'class') {
+    // Tiled default for new classes: usable as property + common entity scopes
+    applyUseAsToRecord(rec, ['property', 'object', 'tile', 'map', 'layer']);
   }
 
-  map.propertytypes.push(rec);
+  list.push(rec);
   return rec;
 }
 
@@ -309,20 +437,30 @@ function addPropertyType(map, opts = {}) {
  */
 function removePropertyType(map, name) {
   if (!name || name === true) throw new Error('prop types remove requires --name <TypeName>');
-  if (!Array.isArray(map.propertytypes)) {
-    if (Array.isArray(map.propertyTypes)) {
-      map.propertytypes = map.propertyTypes;
-      delete map.propertyTypes;
-    } else {
-      throw new Error('Map has no propertytypes');
-    }
-  }
-  const idx = map.propertytypes.findIndex((t) => t && t.name === String(name));
+  const list = ensurePropertyTypesArray(map);
+  if (!list.length) throw new Error('Map has no propertytypes');
+  const idx = list.findIndex((t) => t && t.name === String(name));
   if (idx < 0) throw new Error(`Property type not found: ${name}`);
-  const [removed] = map.propertytypes.splice(idx, 1);
-  if (map.propertytypes.length === 0) delete map.propertytypes;
+  const [removed] = list.splice(idx, 1);
+  if (list.length === 0) delete map.propertytypes;
   return removed;
 }
 
-module.exports.addPropertyType = addPropertyType;
-module.exports.removePropertyType = removePropertyType;
+module.exports = {
+  toObjectMap,
+  listProps,
+  getProp,
+  setProp,
+  removeProp,
+  resolveOwner,
+  resolveTileset,
+  resolveObjectInLayer,
+  ensureObjectProps,
+  listPropertyTypes,
+  getPropertyType,
+  addPropertyType,
+  removePropertyType,
+  expandClassMembers,
+  useAsFromRecord,
+  USE_AS_ALL,
+};

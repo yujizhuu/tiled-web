@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 6 (MCP / coord / prop types write / template tileset merge / wang+terrain list)
+ * tiled-web CLI — Phase 7 (agent goal met: template index / prop types useAs+expand / TMX infinite+zlib)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -56,14 +56,14 @@ const {
 } = require('../lib/world');
 const { replaceGid } = require('../lib/replace');
 const { copyStamp, pasteStamp, loadStamp, writeStampFile } = require('../lib/stamp');
-const { loadTemplate, templateInfo, applyTemplate } = require('../lib/template');
+const { loadTemplate, templateInfo, indexTemplates, applyTemplate } = require('../lib/template');
 const { tileToPixel, pixelToTile } = require('../lib/coord');
 const { listWang, listTerrain } = require('../lib/wang');
 
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 6 CLI (MCP / coord / prop types / template merge / wang)
+  const text = `tiled-web ${PKG.version} — Phase 7 CLI (agent goal met)
 
 Usage:
   tiled-web version
@@ -71,7 +71,8 @@ Usage:
                 [--orientation orthogonal|isometric|hexagonal|staggered]
                 [--staggeraxis y|x] [--staggerindex odd|even] [--hexsidelength N] -o map.tmj
   tiled-web info <map.tmj|map.tmx> [--format json|text]
-  tiled-web export <map.tmj|map.tmx> -f tmj|tmx|csv -o <out>
+  tiled-web export <map.tmj|map.tmx> -f tmj|tmx|csv [-o <out>]
+                   [--encoding csv|base64] [--compression zlib|gzip]   # TMX only
 
   tiled-web set-tile <map> --x X --y Y --gid GID [--layer name|index]
                       [--flip-h] [--flip-v] [--flip-d] [-o out]
@@ -84,6 +85,7 @@ Usage:
   tiled-web stamp paste <map> --layer name|index --x X --y Y --stamp stamp.json [-o out]
 
   tiled-web template info <file.tx|file.tj|file.json>
+  tiled-web template index <dir> [--no-recursive]
   tiled-web template apply <map> --layer <objectlayer> --template <file> --x X --y Y [--create-layer] [-o out]
 
   tiled-web layer list <map>
@@ -108,14 +110,14 @@ Usage:
   tiled-web prop set  <map> --target ... --name KEY --value VAL [--type string|int|float|bool] [-o out]
   tiled-web prop remove <map> --target ... --name KEY [-o out]
   tiled-web prop types list <map>
-  tiled-web prop types get <map> --name TypeName
-  tiled-web prop types add <map> --name TypeName --type enum|class [--values a,b] [--members JSON] [-o out]
+  tiled-web prop types get <map> --name TypeName [--no-expand]
+  tiled-web prop types add <map> --name TypeName --type enum|class
+                           [--values a,b] [--members JSON] [--use-as property,object,tile,…]
+                           [--storage-type string|int] [--color #aarrggbb] [--draw-fill] [-o out]
   tiled-web prop types remove <map> --name TypeName [-o out]
 
-  tiled-web coord tile-to-pixel [<map>] --x TX --y TY [--orientation ...] [--tilewidth ...] [--tileheight ...]
+  tiled-web coord tile-to-pixel|pixel-to-tile [<map>] --x --y [--orientation ...] [--tilewidth ...] [--tileheight ...]
                                 [--staggeraxis y|x] [--staggerindex odd|even] [--hexsidelength N] [--width|--height for iso]
-  tiled-web coord pixel-to-tile [<map>] --x PX --y PY [same flags]
-
   tiled-web wang list <map>
   tiled-web terrain list <map>
 
@@ -131,14 +133,11 @@ Usage:
 Notes:
   - Mutations write in-place unless -o / --output is set.
   - Default --layer for tile cmds is the first tile layer.
-  - Infinite maps (--infinite / map.infinite): set-tile/fill/get-layer/stamp/replace-gid use chunks[].
-  - Stamp paste clips to map bounds on finite maps; infinite writes all cells (creates chunks).
-  - Template apply places an object instance (pixel --x/--y); auto-merges template tilesets (safe firstgid).
-  - Automap --radius N with --x/--y clips the scan region (also uses rule AutomappingRadius when center given).
-  - coord converts tile↔pixel for orthogonal / isometric / hexagonal / staggered (reads map or flags).
-  - wang/terrain list are data-only (no brush UI).
-  - Object identity for prop --target object: --layer + --id (or --object-name).
-  - TMX support is minimal orthogonal (CSV data); infinite TMJ export preserves chunks.
+  - Infinite maps: set-tile/fill/get-layer/stamp/replace-gid use chunks[]; TMX export emits <chunk>.
+  - TMX encodings: CSV (default) or base64; compression zlib|gzip (Node zlib; no zstd). Prefer TMJ for agents.
+  - prop types: classes nest via members type=class + propertyType; get expands membersExpanded. No OO extends.
+  - template index scans .tx/.tj/.json (skips non-template JSON).
+  - wang/terrain list are data-only (no brush UI). GUI leftovers live under tool/.
   - Browser UI under tool/ is unchanged. MCP wrapper: cli/mcp-server.js (zero deps).
 
 Exit: 0 on success; non-zero on error (messages on stderr).
@@ -193,7 +192,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 6 (MCP/coord/prop-types-write/template-tileset-merge/wang+terrain + phases 1–5)\n`);
+  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -249,7 +248,24 @@ function cmdExport(positional, flags) {
   if (!format) die('export requires -f / --format tmj|tmx|csv');
   if (!out) die('export requires -o / --output <path>');
   const map = loadMap(file);
-  const result = exportMap(map, format, out);
+  const encoding = flags.encoding != null && flags.encoding !== true ? String(flags.encoding) : 'csv';
+  const compression =
+    flags.compression != null && flags.compression !== true ? String(flags.compression) : '';
+  if (String(format).toLowerCase() === 'tmx') {
+    if (!['csv', 'base64'].includes(encoding.toLowerCase())) {
+      die('export --encoding must be csv|base64 for TMX');
+    }
+    if (compression && !['zlib', 'gzip', 'none'].includes(compression.toLowerCase())) {
+      die('export --compression must be zlib|gzip (or omit); zstd not supported');
+    }
+    if (encoding.toLowerCase() === 'csv' && compression && compression.toLowerCase() !== 'none') {
+      die('TMX CSV cannot be compressed; use --encoding base64 --compression zlib');
+    }
+  }
+  const result = exportMap(map, format, out, {
+    encoding,
+    compression: compression.toLowerCase() === 'none' ? '' : compression,
+  });
   ok(result);
 }
 
@@ -530,9 +546,20 @@ function cmdProp(positional, flags) {
       return;
     }
     if (tsub === 'get') {
-      const rec = getPropertyType(map, flags.name);
+      const expand = !(flags['no-expand'] || flags.noExpand);
+      const rec = getPropertyType(map, flags.name, { expand });
+      const { raw, ...rest } = rec;
       process.stdout.write(
-        JSON.stringify({ file: path.resolve(file), ...rec }, null, 2) + '\n'
+        JSON.stringify(
+          {
+            file: path.resolve(file),
+            ...rest,
+            limits:
+              'Classes nest via members type=class+propertyType (membersExpanded). No OO extends. useAs: property|map|layer|object|tile|tileset|wangcolor|wangset|project.',
+          },
+          null,
+          2
+        ) + '\n'
       );
       return;
     }
@@ -662,13 +689,32 @@ function cmdStamp(positional, flags) {
 
 function cmdTemplate(positional, flags) {
   const sub = positional[0];
-  if (!sub) die('template requires subcommand: info|apply');
+  if (!sub) die('template requires subcommand: info|index|apply');
 
   if (sub === 'info') {
     const file = positional[1];
     if (!file) die('template info requires a template path (.tx / .tj / .json)');
     const tpl = loadTemplate(file);
     process.stdout.write(JSON.stringify(templateInfo(tpl, file), null, 2) + '\n');
+    return;
+  }
+  if (sub === 'index') {
+    const dir = positional[1];
+    if (!dir) die('template index requires a directory path');
+    const recursive = !(flags['no-recursive'] || flags.noRecursive);
+    const templates = indexTemplates(dir, { recursive });
+    process.stdout.write(
+      JSON.stringify(
+        {
+          dir: path.resolve(dir),
+          recursive,
+          count: templates.length,
+          templates,
+        },
+        null,
+        2
+      ) + '\n'
+    );
     return;
   }
   if (sub === 'apply') {
@@ -699,7 +745,7 @@ function cmdTemplate(positional, flags) {
     });
     return;
   }
-  die(`Unknown template subcommand: ${sub} (use info|apply)`);
+  die(`Unknown template subcommand: ${sub} (use info|index|apply)`);
 }
 
 function cmdReplaceGid(positional, flags) {
