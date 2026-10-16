@@ -12,6 +12,7 @@
       '<h3>' + esc(s.title) + '</h3><p class="help-summary">' + esc(s.summary) + '</p>' +
       (s.what ? '<h4>是什么</h4><p>' + esc(s.what) + '</p>' : '') +
       (s.why ? '<h4>为什么</h4><p>' + esc(s.why) + '</p>' : '') +
+      (s.figure ? '<figure class="help-figure">' + s.figure + '</figure>' : '') +
       (s.how ? '<h4>怎么做</h4>' + how : '') +
       (s.example ? '<p class="help-example"><b>例子：</b>' + esc(s.example) + '</p>' : '') +
       (s.note ? '<p class="help-note">' + esc(s.note) + '</p>' : '') + '</article>';
