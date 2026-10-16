@@ -22,10 +22,11 @@
     root = document.createElement('div');
     root.id = 'helpPanel'; root.className = 'help-panel hidden';
     root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', '帮助');
-    root.innerHTML = '<div class="help-inner"><header><span>帮助 · 是什么 / 为什么 / 怎么做</span>' +
+    root.innerHTML = '<div class="help-inner"><header><span>帮助 · 是什么 / 为什么 / 怎么做</span><button type="button" class="help-tour-btn" data-guide="help-tour">🎓 开始新手引导</button>' +
       '<input id="helpSearch" type="search" placeholder="搜索：图层、自动地图、TMX…"><button type="button" data-help-close title="关闭（Esc）">关闭</button></header>' +
       '<div class="help-body"><nav id="helpToc" class="help-toc"></nav><div id="helpContent" class="help-content"></div></div></div>';
     document.body.appendChild(root);
+    root.querySelector('.help-tour-btn').onclick = () => { close(); const g = window.TiledApp && window.TiledApp.guide; if (g) g.startTour(); };
     list = root.querySelector('#helpToc'); body = root.querySelector('#helpContent'); search = root.querySelector('#helpSearch');
     let g = '', toc = '';
     H.forEach((s) => { if (s.group !== g) { g = s.group; toc += '<div class="help-group">' + esc(g) + '</div>'; } toc += '<a href="#help-' + s.id + '" data-help-link="' + s.id + '" title="' + esc(s.summary) + '">' + esc(s.title) + '</a>'; });

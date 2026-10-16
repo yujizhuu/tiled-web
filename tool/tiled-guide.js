@@ -113,7 +113,7 @@
       S.push({ t: '画布', d: '中间是地图本身。选好图块和工具，在这里点或拖着画。滚轮滚动，+ / − 缩放。', el: () => firstVisible('#canvasWrap') });
       if (objectRect()) S.push({ t: '地图上的对象', d: '亮起来的就是对象层里的对象：圆点是点对象（如出生点），方框 / 圆圈是区域，带字的是名字或文本。用 ⌖ 选择工具点一下，左边会显示它是什么。', rect: objectRect });
       S.push({ t: '属性面板', d: '选中图层或对象后，这里显示它的名字、位置、大小和自定义属性；上方的提示条会说明它是什么，点「详细 →」看完整解释。', el: () => firstVisible('.objects-section', '.map-section') });
-      S.push({ t: '帮助', d: '不懂的地方点这个蓝色 ?（或按 F1）。每个面板标题旁的小 ? 会直接跳到对应说明。祝你画得开心！', el: () => firstVisible('.help-main') });
+      S.push({ t: '帮助', d: '不懂的地方点这个蓝色 ?（或按 F1）。每个面板标题旁的小 ? 会直接跳到对应说明。想再看一遍本引导，点旁边的 🎓 教程。祝你画得开心！', el: () => firstVisible('.help-main') });
       return S;
     }
     function startTour() {
@@ -189,6 +189,20 @@
       hintItem = mk('', () => setHints(!hintsOn()), 'hints'); p.insertBefore(hintItem, p.children[2] || null); syncMenu();
     })(0);
 
+    /* ---------- 显眼的教程入口 ---------- */
+    (function addEntry(n) {
+      const help = document.querySelector('.topbar .help-main');
+      if (!help) { if (n < 80) setTimeout(() => addEntry(n + 1), 50); return; }
+      if (!document.querySelector('.tour-entry')) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'tour-entry'; b.dataset.guide = 'topbar-tour';
+        b.title = '新手引导：一步步认识界面（随时可重看）'; b.innerHTML = '🎓<span class="tour-entry-txt"> 教程</span>';
+        b.onclick = (e) => { e.stopPropagation(); startTour(); };
+        help.after(b);
+        if (window.TiledTopbar) window.TiledTopbar.layout();
+      }
+    })(0);
+    const empty = document.querySelector('#emptyHint');
+    if (empty && !empty.querySelector('.empty-tour')) { const a = document.createElement('a'); a.className = 'empty-tour'; a.textContent = '第一次用？看新手引导 →'; a.onclick = startTour; empty.appendChild(a); }
     api.guide = { startTour, endTour, setHints, hintsOn, objKind, isTourOpen: () => !!ov, step: () => idx, steps: () => steps, next: () => (ov && (idx >= steps.length - 1 ? endTour() : go(idx + 1))) };
     // 首次访问自动开始（自动化测试环境不自动弹出，测试里显式调用）
     if (!ls.get(TOUR_DONE) && !navigator.webdriver) setTimeout(startTour, 700);

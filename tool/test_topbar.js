@@ -22,7 +22,7 @@ const check = (ok, msg) => { console.log((ok ? 'ok   ' : 'FAIL ') + msg); if (!o
       const de = document.documentElement, bar = document.querySelector('.topbar'), tb = bar.querySelector('.toolbar');
       const vis = (el) => { const s = getComputedStyle(el); const b = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
       // 顶栏顶层元素：品牌、帮助键、各菜单按钮、常用图标、工具按钮、缩放、状态、更多
-      const sel = '.brand-mark, .brand>span, .help-main, .tb-menubar>.tb-menu>.tb-menu-btn, .tb-primary>button, .toolbar>.tb-tools .tool-mode>button, .toolbar>.tb-tools .tool-group:not([hidden])>button, .toolbar>.zoom, .topbar>.status, .tb-more>.tb-menu-btn';
+      const sel = '.brand-mark, .brand>span, .help-main, .tour-entry, .tb-menubar>.tb-menu>.tb-menu-btn, .tb-primary>button, .toolbar>.tb-tools .tool-mode>button, .toolbar>.tb-tools .tool-group:not([hidden])>button, .toolbar>.zoom, .topbar>.status, .tb-more>.tb-menu-btn';
       const els = [...bar.querySelectorAll(sel)].filter((e) => vis(e) && !e.closest('.tb-menu-panel'));
       const boxes = els.map((e) => { const b = e.getBoundingClientRect(); return { n: (e.className || e.tagName) + ':' + (e.textContent || '').trim().slice(0, 8), l: b.left, r: b.right, t: b.top, b: b.bottom }; });
       const hits = [];
