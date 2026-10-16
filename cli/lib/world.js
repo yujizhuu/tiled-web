@@ -54,7 +54,8 @@ function worldInfo(world, filePath) {
       width: m.width != null ? Number(m.width) : null,
       height: m.height != null ? Number(m.height) : null,
     })),
-    patterns: world.patterns || [],
+    patterns: (world.patterns || []).map((p) => { const c = compilePattern(p); return { ...p, errors: c.errors.length ? c.errors : undefined }; }),
+    resolvedMaps: resolveMaps(world, filePath),
   };
 }
 
@@ -140,6 +141,65 @@ function removeMap(world, { fileName, index }) {
   return { removed, index: i };
 }
 
+/* ---- patterns (upstream Tiled src/libtiled/world.cpp, 1.2.4 worldmanager.cpp) ----
+ * multiplierX/Y default 1 (0 invalid), offsetX/Y default 0, mapWidth/Height default |multiplier|,
+ * regexp must have exactly 2 capture groups; QRegularExpression::match is an UNANCHORED search;
+ * only files directly in the .world file's folder are considered; capture -> QString::toInt (0 on failure). */
+function qtToInt(s) { return /^\s*[+-]?\d+\s*$/.test(String(s)) ? parseInt(s, 10) : 0; }
+function captureCount(re) { return (new RegExp(re.source + '|')).exec('').length - 1; }
+function compilePattern(p) {
+  const out = { regexp: String(p.regexp || ''), errors: [] };
+  let re; try { re = new RegExp(out.regexp); } catch (e) { out.errors.push('invalid regexp: ' + e.message); return out; }
+  const int = (v, d) => (v == null ? d : Number.isInteger(Number(v)) ? Number(v) : d);
+  out.multiplierX = int(p.multiplierX, 1); out.multiplierY = int(p.multiplierY, 1);
+  out.offsetX = int(p.offsetX, 0); out.offsetY = int(p.offsetY, 0);
+  out.mapWidth = int(p.mapWidth, Math.abs(out.multiplierX)); out.mapHeight = int(p.mapHeight, Math.abs(out.multiplierY));
+  if (captureCount(re) !== 2) out.errors.push('2 captures expected');
+  else if (out.multiplierX === 0) out.errors.push('invalid multiplierX');
+  else if (out.multiplierY === 0) out.errors.push('invalid multiplierY');
+  else if (out.mapWidth <= 0) out.errors.push('invalid mapWidth');
+  else if (out.mapHeight <= 0) out.errors.push('invalid mapHeight');
+  out.re = re; return out;
+}
+/** World::allMaps(): explicit maps + every file in the world folder matched by a pattern. */
+function resolveMaps(world, worldPath) {
+  const all = (world.maps || []).map((m) => ({ fileName: m.fileName, x: Number(m.x) || 0, y: Number(m.y) || 0, width: m.width, height: m.height, source: 'maps' }));
+  const pats = (world.patterns || []).map(compilePattern);
+  if (!pats.length || !worldPath) return all;
+  const dir = path.dirname(path.resolve(worldPath));
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name).sort(); } catch { /* none */ }
+  pats.forEach((p, pi) => {
+    if (p.errors.length) return;
+    for (const name of entries) {
+      const m = p.re.exec(name);
+      if (!m) continue;
+      all.push({ fileName: name, x: qtToInt(m[1]) * p.multiplierX + p.offsetX, y: qtToInt(m[2]) * p.multiplierY + p.offsetY,
+        width: p.mapWidth, height: p.mapHeight, source: 'pattern', pattern: pi });
+    }
+  });
+  return all;
+}
+function addPattern(world, o) {
+  if (!o.regexp || o.regexp === true) throw new Error('world add-pattern requires --regexp');
+  const e = { regexp: String(o.regexp) };
+  for (const k of ['multiplierX', 'multiplierY', 'offsetX', 'offsetY', 'mapWidth', 'mapHeight']) {
+    if (o[k] == null || o[k] === true || o[k] === '') continue;
+    const n = Number(o[k]); if (!Number.isInteger(n)) throw new Error(`world add-pattern: ${k} must be an integer`);
+    e[k] = n;
+  }
+  const c = compilePattern(e);
+  if (c.errors.length) throw new Error('world add-pattern: ' + c.errors.join('; ') + ' (upstream Tiled rejects this pattern)');
+  if (!Array.isArray(world.patterns)) world.patterns = [];
+  world.patterns.push(e);
+  return { pattern: e, index: world.patterns.length - 1 };
+}
+function removePattern(world, index) {
+  const i = Number(index);
+  if (!Array.isArray(world.patterns) || !Number.isInteger(i) || i < 0 || i >= world.patterns.length) throw new Error(`world remove-pattern: index out of range: ${index}`);
+  return { removed: world.patterns.splice(i, 1)[0], index: i };
+}
+
 /**
  * Prefer storing relative path from world file directory when possible.
  */
@@ -159,4 +219,8 @@ module.exports = {
   addMap,
   removeMap,
   relativizeMapFile,
+  addPattern,
+  removePattern,
+  resolveMaps,
+  compilePattern,
 };

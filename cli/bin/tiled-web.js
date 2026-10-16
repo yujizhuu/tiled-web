@@ -53,6 +53,8 @@ const {
   worldInfo,
   addMap: worldAddMap,
   removeMap: worldRemoveMap,
+  addPattern: worldAddPattern,
+  removePattern: worldRemovePattern,
   relativizeMapFile,
 } = require('../lib/world');
 const { replaceGid } = require('../lib/replace');
@@ -128,6 +130,9 @@ Usage:
   tiled-web world new -o file.world
   tiled-web world add-map <file.world> --file map.tmj --x X --y Y [--width W] [--height H]
   tiled-web world remove-map <file.world> --file map.tmj|--index N
+  tiled-web world add-pattern <file.world> --regexp 'region_(\d+)_(\d+)\.tmj' [--multiplier-x N] [--multiplier-y N]
+                 [--offset-x N] [--offset-y N] [--map-width W] [--map-height H]   (upstream defaults 1/1/0/0/|mx|/|my|)
+  tiled-web world remove-pattern <file.world> --index N
 
   MCP (stdio): node cli/mcp-server.js   # see README for Cursor/Claude config
 
@@ -817,7 +822,7 @@ function cmdAutomap(positional, flags) {
 
 function cmdWorld(positional, flags) {
   const sub = positional[0];
-  if (!sub) die('world requires subcommand: info|new|add-map|remove-map');
+  if (!sub) die('world requires subcommand: info|new|add-map|remove-map|add-pattern|remove-pattern');
 
   if (sub === 'new') {
     const out = flags.output;
@@ -868,7 +873,22 @@ function cmdWorld(positional, flags) {
     return;
   }
 
-  die(`Unknown world subcommand: ${sub} (use info|new|add-map|remove-map)`);
+  if (sub === 'add-pattern') {
+    const world = loadWorld(file);
+    const r = worldAddPattern(world, { regexp: flags.regexp, multiplierX: flags['multiplier-x'], multiplierY: flags['multiplier-y'],
+      offsetX: flags['offset-x'], offsetY: flags['offset-y'], mapWidth: flags['map-width'], mapHeight: flags['map-height'] });
+    const saved = saveWorld(world, flags.output || file);
+    ok({ action: 'world-add-pattern', ...r, ...saved });
+    return;
+  }
+  if (sub === 'remove-pattern') {
+    const world = loadWorld(file);
+    const r = worldRemovePattern(world, flags.index);
+    const saved = saveWorld(world, flags.output || file);
+    ok({ action: 'world-remove-pattern', ...r, ...saved });
+    return;
+  }
+  die(`Unknown world subcommand: ${sub} (use info|new|add-map|remove-map|add-pattern|remove-pattern)`);
 }
 
 

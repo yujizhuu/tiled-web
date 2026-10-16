@@ -8,7 +8,7 @@ export QT_QPA_PLATFORM=offscreen
 V=validate; rm -rf $V; mkdir -p $V
 
 echo "== 1. tmxrasterizer 渲染 TMX/TMJ/压缩变体/无限图/World（能打开 = 格式被上游接受）=="
-for f in village.tmj village.tmx village.zlib.tmx village.gzip.tmx cave.tmj cave.tmx demo.world; do
+for f in village.tmj village.tmx village.zlib.tmx village.gzip.tmx cave.tmj cave.tmx forest.tmj lake.tmj field.tmj demo.world; do
   tmxrasterizer --scale 2 "$f" "$V/${f}.png" 2>/dev/null; echo "  ok  $f"
 done
 python3 - <<'PY'
@@ -73,4 +73,25 @@ PY
 else
   echo "  SKIP: 无 xvfb-run"
 fi
+echo "== 4. World：上游 tmxrasterizer 加载 .world（含 patterns）并与 CLI 解析逐像素对照 =="
+for w in demo.world regions/regions.world; do
+  n=$(basename $w .world)
+  tmxrasterizer --scale 2 "$w" "$V/$n.upstream.png" 2>/dev/null
+  python3 ../world_render.py "$w" "$V/$n.cli.png" 2 --plain >/dev/null
+  node ../../../cli/bin/tiled-web.js world info "$w" > "$V/$n.info.json"
+done
+python3 - <<'PY'
+import json
+from PIL import Image, ImageChops
+for n, need in [("demo", 5), ("regions", 6)]:
+    info = json.load(open(f"validate/{n}.info.json")); maps = info["resolvedMaps"]
+    assert len(maps) == need, (n, len(maps))
+    up = Image.open(f"validate/{n}.upstream.png").convert("RGBA"); me = Image.open(f"validate/{n}.cli.png").convert("RGBA")
+    assert up.size == me.size, (n, up.size, me.size)   # 上游按同样的 maps/patterns 坐标拼出同样大小的世界
+    bb = ImageChops.difference(up, me).getbbox()
+    # 允许的唯一差异：村庄 Zone 矩形对象的描边在地图上沿外 1px（单图渲染被裁掉，整世界渲染能画出来）
+    assert bb is None or bb[3] - bb[1] <= 1, (n, bb)
+    src = "patterns 正则" if n == "regions" else "显式 maps"
+    print(f"  {n}.world（{src}）：上游加载 {len(maps)} 张图，世界尺寸 {up.size[0]//2}×{up.size[1]//2}px，逐像素一致" + ("" if bb is None else "（仅 1px 对象描边差）"))
+PY
 echo "VALIDATE OK"

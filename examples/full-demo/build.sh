@@ -134,7 +134,7 @@ q fill $C --x -4 --y -3 --width 24 --height 6 --gid 15   # 洞壁
 q fill $C --x -3 --y -2 --width 22 --height 4 --gid 14   # 洞底
 q set-tile $C --x 18 --y 0 --gid 9
 q stamp copy $C --layer 0 --x -4 --y -3 --width 3 --height 3 -o $O/cave.stamp.json
-q stamp paste $C --layer 0 --x 30 --y 30 --stamp $O/cave.stamp.json
+q stamp paste $C --layer 0 --x 20 --y -3 --stamp $O/cave.stamp.json   # 隧道尽头的小石室
 t info $C
 
 echo "== 10. 坐标换算: ortho / iso / hex / staggered =="
@@ -157,14 +157,71 @@ echo "== 11. Wang / 地形 (只读) =="
 t wang list $M
 t terrain list $M
 
-echo "== 12. World: 村庄 + 洞穴 =="
+echo "== 12. World（一）: 显式列表 2×2 + 洞穴 —— 道路/河流跨地图边界接上 =="
+# 每张 20×14 = 320×224 px。村庄(0,0) 森林(320,0) / 湖泊(0,224) 田野(320,224)；洞穴在森林东侧。
+# 接缝：村庄东西大路 y=7 → 森林；村庄南路 x=9 → 湖泊；森林南路 x=9 → 田野；湖泊河流 y=6..7 → 田野。
+newmap() { q new --width 20 --height 14 --tilewidth 16 --tileheight 16 -o "$1"; q tileset add "$1" --firstgid 1 --source ../village.tsx
+  q layer rename "$1" --layer 0 --name Ground; q layer add "$1" --name Deco --type tile; q fill "$1" --layer Ground --x 0 --y 0 --width 20 --height 14 --gid 1; }
+g() { q fill "$1" --layer Ground --x $2 --y $3 --width $4 --height $5 --gid $6; }       # Ground 矩形
+d() { q fill "$1" --layer Deco --x $2 --y $3 --width $4 --height $5 --gid $6; }         # Deco 矩形
+dt() { local f=$1 gid=$2; shift 2; for xy in "$@"; do set -- $xy; q set-tile $f --layer Deco --x $1 --y $2 --gid $gid; done; }
+
+F=$O/forest.tmj; newmap $F                                                          # 森林
+g $F 0 7 20 1 10; g $F 9 8 1 6 10                                                   # 大路接村庄、南路接田野
+g $F 3 2 4 2 2; g $F 13 10 3 2 2                                                    # 林间空地（土）
+d $F 0 0 20 6 7; d $F 0 9 8 5 7; d $F 11 9 9 5 7; d $F 0 8 20 1 0; d $F 0 6 20 1 0 # 密林，路两侧留出一行
+d $F 2 1 6 4 0; d $F 12 9 5 4 0                                                     # 挖出两块空地
+dt $F 24 "3 2" "6 3" "13 10" "15 11" "18 6"; dt $F 11 "4 3" "5 1" "14 9" "16 12"; dt $F 16 "2 4" "12 12" "8 6" "11 8"
+dt $F 23 "7 2" "12 10"; dt $F 26 "10 8"; dt $F 29 "1 6" "4 8" "15 6" "19 8"
+
+L=$O/lake.tmj; newmap $L                                                            # 湖泊
+g $L 1 1 8 12 12; g $L 2 2 6 10 3                                                   # 沙岸 + 湖
+g $L 8 5 12 4 12; g $L 7 6 13 2 3                                                   # 河（沙岸），向东流入田野
+g $L 9 0 1 5 10; g $L 9 9 1 5 10; g $L 9 5 1 4 6                                    # 南路，过河处木桥
+dt $L 30 "3 4" "5 8" "6 3" "4 10" "14 7"; dt $L 23 "1 1" "8 12" "17 5"; dt $L 7 "11 1" "13 2" "16 1" "18 3" "0 13" "12 11" "15 12" "18 11"
+dt $L 16 "11 3" "15 10" "19 13"; dt $L 11 "12 2" "17 11" "11 12"; dt $L 29 "14 3" "10 10" "1 0"; dt $L 28 "10 4" "10 9"
+
+D=$O/field.tmj; newmap $D                                                           # 田野
+g $D 0 5 20 4 12; g $D 0 6 15 2 3; g $D 13 6 2 8 3; g $D 12 8 4 6 12; g $D 13 8 2 6 3 # 河从湖泊流入后折向南
+g $D 9 0 1 14 10; g $D 9 5 1 4 6                                                    # 北路接森林，木桥过河
+g $D 1 1 7 3 2; g $D 1 10 7 3 2; g $D 16 1 3 3 2                                    # 农田（土）
+for y in 1 3 10 12; do d $D 1 $y 7 1 29; done; d $D 16 2 3 1 11                     # 庄稼行 + 花圃
+d $D 1 4 7 1 25; d $D 1 13 7 1 25                                                   # 栅栏
+dt $D 27 "11 2"; dt $D 32 "12 2" "11 11"; dt $D 26 "10 4"; dt $D 7 "18 10" "19 12" "17 13" "0 9" "19 4"; dt $D 16 "11 9" "17 9"
+
 W=$O/demo.world
 q world new -o $W
 q world add-map $W --file village.tmj --x 0 --y 0 --width 320 --height 224   # 显式尺寸
-q world add-map $W --file cave.tmj --x 320 --y 0
-q world add-map $W --file iso.tmj --x 0 --y 224      # 省略尺寸 → 自动从地图读取
-q world remove-map $W --file iso.tmj
-t world info $W
+q world add-map $W --file forest.tmj --x 320 --y 0                           # 省略尺寸 → 自动从地图读取
+q world add-map $W --file lake.tmj --x 0 --y 224
+q world add-map $W --file field.tmj --x 320 --y 224
+q world add-map $W --file cave.tmj --x 704 --y 48                            # 无限地图：(−4,−3) 号格对齐森林东缘
+q world add-map $W --file iso.tmj --x 0 --y 448
+q world remove-map $W --file iso.tmj                                         # 演示移除
+t world info $W >/dev/null
+
+echo "== 12b. World（二）: patterns 正则自动收图 region_X_Y.tmj =="
+RG=$O/regions; mkdir -p $RG
+# 3×2 块 10×10 图块（160px），全局坐标画一座跨 6 张图的岛：gfill gid gx gy w h 自动裁到各区域
+for rx in 0 1 2; do for ry in 0 1; do f=$RG/region_${rx}_${ry}.tmj
+  q new --width 10 --height 10 --tilewidth 16 --tileheight 16 -o $f; q tileset add $f --firstgid 1 --source ../../village.tsx
+  q fill $f --x 0 --y 0 --width 10 --height 10 --gid 3; q layer add $f --name Deco --type tile; done; done
+gfill() { local layer=$1 gid=$2 gx=$3 gy=$4 w=$5 h=$6 rx ry x0 y0 x1 y1
+  for rx in 0 1 2; do for ry in 0 1; do
+    x0=$(( gx > rx*10 ? gx : rx*10 )); y0=$(( gy > ry*10 ? gy : ry*10 ))
+    x1=$(( gx+w < rx*10+10 ? gx+w : rx*10+10 )); y1=$(( gy+h < ry*10+10 ? gy+h : ry*10+10 ))
+    (( x1 > x0 && y1 > y0 )) && q fill $RG/region_${rx}_${ry}.tmj --layer $layer --x $((x0-rx*10)) --y $((y0-ry*10)) --width $((x1-x0)) --height $((y1-y0)) --gid $gid
+  done; done; return 0; }
+gfill 0 12 3 3 24 14; gfill 0 12 2 5 26 10; gfill 0 1 5 5 20 10; gfill 0 1 4 7 22 6   # 沙滩 + 草地
+gfill 0 10 6 10 18 1; gfill 0 10 15 6 1 8; gfill 0 3 10 7 3 2                        # 十字路 + 小池
+gfill Deco 7 6 6 3 2; gfill Deco 7 20 6 4 3; gfill Deco 7 6 12 3 2; gfill Deco 7 19 12 4 2 # 树林
+gfill Deco 11 12 11 2 1; gfill Deco 16 17 8 1 1; gfill Deco 27 16 9 1 1; gfill Deco 30 11 8 1 1; gfill Deco 23 3 4 1 1
+PW=$RG/regions.world
+q world new -o $PW
+q world add-pattern $PW --regexp 'region_(\d+)_(\d+)\.tmj' --multiplier-x 160 --multiplier-y 160 --offset-x -240 --offset-y -160 --map-width 160 --map-height 160
+q world add-pattern $PW --regexp 'tmp_(\d+)_(\d+)'           # 加一个再删掉，演示 remove-pattern
+q world remove-pattern $PW --index 1
+t world info $PW | python3 -c "import json,sys; w=json.load(sys.stdin); print('  pattern 收到', len(w['resolvedMaps']), '张：', ', '.join('%s@(%d,%d)'%(m['fileName'],m['x'],m['y']) for m in w['resolvedMaps']))"
 
 echo "== 13. MCP stdio =="
 python3 "$HERE/mcp_demo.py" "$ROOT/cli/mcp-server.js" "$HERE/$M"
@@ -182,4 +239,6 @@ t info $O/village.zlib.tmx >/dev/null
 echo "== 15. 预览图 =="
 python3 "$HERE/render.py" "$M" "$O/village.png"
 python3 "$HERE/render.py" "$C" "$O/cave.png"
+python3 "$HERE/world_render.py" "$O/demo.world" "$O/world.png"
+python3 "$HERE/world_render.py" "$O/regions/regions.world" "$O/regions.png"
 echo "OK → $HERE/$O"

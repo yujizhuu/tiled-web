@@ -563,6 +563,34 @@
       return (state.world.maps || []).find((m) => String(m.fileName).split('/').pop() === base) || null;
     }
 
+    // 与上游一致（src/libtiled/world.cpp World::allMaps / 1.2.4 worldmanager.cpp）：
+    // multiplierX/Y 默认 1（0 无效）、offset 默认 0、mapWidth/Height 默认 |multiplier|；正则须恰好 2 个捕获组；
+    // QRegularExpression::match 是非锚定搜索；只匹配 .world 所在文件夹里的文件（不含子目录）；捕获组按 QString::toInt（失败为 0）。
+    function compileWorldPattern(p) {
+      let re; try { re = new RegExp(String(p.regexp || '')); } catch (_) { return null; }
+      const caps = new RegExp(re.source + '|').exec('').length - 1;
+      const int = (v, d) => (v == null || !Number.isInteger(Number(v)) ? d : Number(v));
+      const c = { re, mx: int(p.multiplierX, 1), my: int(p.multiplierY, 1), ox: int(p.offsetX, 0), oy: int(p.offsetY, 0) };
+      c.mw = int(p.mapWidth, Math.abs(c.mx)); c.mh = int(p.mapHeight, Math.abs(c.my));
+      if (caps !== 2 || !c.mx || !c.my || c.mw <= 0 || c.mh <= 0) return null;
+      return c;
+    }
+    const qtToInt = (s) => (/^\s*[+-]?\d+\s*$/.test(String(s)) ? parseInt(s, 10) : 0);
+    function worldFolderNames() {
+      // 文件夹模式：assetFileIndex 的键是相对路径 → 只取与 .world 同目录的文件；否则（多选文件）取全部文件名
+      const names = new Set();
+      const wp = state.workspaceMapPath && /\.world$/i.test(state.workspaceMapPath) ? state.workspaceMapPath : (state.worldPath || null);
+      const wdir = wp && wp.includes('/') ? wp.slice(0, wp.lastIndexOf('/') + 1) : '';
+      const keys = [];
+      if (state.assetFileIndex) state.assetFileIndex.forEach((_, k) => keys.push(String(k)));
+      if (state.worldFiles) state.worldFiles.forEach((_, k) => keys.push(String(k)));
+      const anyPaths = keys.some((k) => k.includes('/'));
+      for (const k of keys) {
+        if (anyPaths && wp) { if (k.startsWith(wdir) && !k.slice(wdir.length).includes('/')) names.add(k.slice(wdir.length)); }
+        else if (!k.includes('/')) names.add(k);
+      }
+      return [...names].sort();
+    }
     function expandWorldPatterns() {
       if (!state.world) return 0;
       const patterns = state.world.patterns || [];
@@ -570,26 +598,14 @@
       if (!state.world.maps) state.world.maps = [];
       const existing = new Set(state.world.maps.map((m) => String(m.fileName).split('/').pop()));
       let added = 0;
-      const names = new Set();
-      if (state.assetFileIndex) state.assetFileIndex.forEach((_, k) => names.add(String(k).split('/').pop()));
-      if (state.worldFiles) state.worldFiles.forEach((_, k) => names.add(String(k).split('/').pop()));
+      const names = worldFolderNames();
       for (const pat of patterns) {
-        let re;
-        try { re = new RegExp(pat.regexp); } catch (_) { continue; }
-        const mx = Number(pat.multiplierX || 0), my = Number(pat.multiplierY || 0);
-        const ox = Number(pat.offsetX || 0), oy = Number(pat.offsetY || 0);
-        const mw = Number(pat.mapWidth != null ? pat.mapWidth : mx);
-        const mh = Number(pat.mapHeight != null ? pat.mapHeight : my);
+        const c = compileWorldPattern(pat);
+        if (!c) { api.log('World pattern 无效（上游会拒绝）：' + (pat.regexp || '')); continue; }
         for (const name of names) {
-          const m = re.exec(name);
-          if (!m) continue;
-          if (existing.has(name)) continue;
-          const gx = Number(m[1]) * mx + ox;
-          const gy = Number(m[2]) * my + oy;
-          const entry = { fileName: name, x: gx, y: gy };
-          if (mw) entry.width = mw;
-          if (mh) entry.height = mh;
-          state.world.maps.push(entry);
+          const m = c.re.exec(name);
+          if (!m || existing.has(name)) continue;
+          state.world.maps.push({ fileName: name, x: qtToInt(m[1]) * c.mx + c.ox, y: qtToInt(m[2]) * c.my + c.oy, width: c.mw, height: c.mh, fromPattern: true });
           existing.add(name);
           added++;
         }
@@ -656,8 +672,8 @@
         ctx.font = '11px sans-serif';
         ctx.fillText(base, dx + 4, dy + 14);
         if (cached && cached.layers && m.orientation === 'orthogonal') {
-          ctx.globalAlpha = 0.35;
-          // cheap: draw first tilelayer GIDs as dots relative to current map origin in pixels
+          ctx.globalAlpha = state.worldGhostAlpha != null ? state.worldGhostAlpha : 0.85;
+          // 邻图：画全部图块层（同一套图块集按 gid 解析）
           const tw = cached.tilewidth || 32, th = cached.tileheight || 32;
           for (const l of cached.layers) {
             if (l.type !== 'tilelayer' || !l.data) continue;
@@ -684,7 +700,6 @@
                 ctx.fillRect(px, py, Math.max(2, tw * s - 1), Math.max(2, th * s - 1));
               }
             }
-            break; // first tilelayer only for perf
           }
         }
         ctx.restore();
@@ -692,6 +707,7 @@
     };
 
     // Prefetch world maps when world loads / panel renders
+    const expandedWorlds = new WeakSet();
     const _renderWorld = F.renderWorldPanel;
     F.renderWorldPanel = function () {
       if (_renderWorld) _renderWorld();
@@ -709,8 +725,10 @@
         const chk = panel.querySelector('#worldViewChk');
         if (chk) chk.onchange = () => { state.worldView = chk.checked; api.draw(); };
       }
-      // prefetch
-      (state.world.maps || []).forEach((e) => { ensureWorldMapCached(e.fileName); });
+      // 打开 world 即按 patterns 自动收图（上游 World::allMaps 也是加载即生效）
+      if (!expandedWorlds.has(state.world)) { expandedWorlds.add(state.world); const n = expandWorldPatterns(); if (n) { api.log('World patterns 收到 ' + n + ' 张图'); F.renderWorldPanel(); return; } }
+      // prefetch，全部就绪后重绘邻图
+      Promise.all((state.world.maps || []).map((e) => ensureWorldMapCached(e.fileName))).then(() => api.draw());
       // make entries draggable via inputs
       panel.querySelectorAll('.world-map-btn').forEach((btn) => {
         if (btn._b5) return;
@@ -971,7 +989,9 @@
       };
       else if (a === 'world-export') b.onclick = () => {
         if (!state.world) return;
-        api.download('world.world', 'application/json', JSON.stringify(state.world, null, 2));
+        // 和上游一样：pattern 收到的图不写进 maps（只存 patterns 本身）
+        const out = { ...state.world, maps: (state.world.maps || []).filter((m) => !m.fromPattern) };
+        api.download('world.world', 'application/json', JSON.stringify(out, null, 2));
       };
     });
 
@@ -1024,7 +1044,7 @@
 
     Object.assign(F, {
       drawRuleCanvasEnhanced, wildWangIdIsUsed, wangFillerFillLookAhead,
-      expandWorldPatterns, pruneEmptyChunks, toggleInfinite, ensureWorldMapCached,
+      expandWorldPatterns, compileWorldPattern, pruneEmptyChunks, toggleInfinite, ensureWorldMapCached,
       renderPropertyTypesList, renderChunkPanel, getSurroundingPoints
     });
 
@@ -1034,4 +1054,99 @@
 
   window.initTiledBatch5 = boot;
   if (window.TiledApp) setTimeout(() => boot(window.TiledApp), 80);
+})();
+
+/* ===== World 背景层：在当前地图四周按 world 坐标画出其它地图（像桌面版 Tiled 的世界视图） =====
+ * 主画布坐标/交互不变：只给主画布加 margin，把整张世界画在它下面的绝对定位画布上。 */
+(function () {
+  function boot(api) {
+    const state = api.getState();
+    const F = api.features || (api.features = {});
+    const cvs = document.getElementById('canvas'); const wrap = document.getElementById('canvasWrap');
+    if (!cvs || !wrap) return;
+    let back = null;
+    const base = (p) => String(p || '').split('/').pop();
+    function sizeOf(e, mm) {
+      if (e.width && e.height) return { w: e.width, h: e.height };
+      if (mm && !mm.infinite) return { w: mm.width * mm.tilewidth, h: mm.height * mm.tileheight };
+      return null;
+    }
+    function extent(e, mm) { // 世界坐标包围盒（无限图按 chunk 范围）
+      if (mm && mm.infinite) {
+        const cs = []; (mm.layers || []).forEach((l) => (l.chunks || []).forEach((c) => cs.push(c)));
+        if (cs.length) {
+          const x0 = Math.min(...cs.map((c) => c.x)), y0 = Math.min(...cs.map((c) => c.y));
+          const x1 = Math.max(...cs.map((c) => c.x + c.width)), y1 = Math.max(...cs.map((c) => c.y + c.height));
+          return { x: e.x + x0 * mm.tilewidth, y: e.y + y0 * mm.tileheight, w: (x1 - x0) * mm.tilewidth, h: (y1 - y0) * mm.tileheight };
+        }
+      }
+      const s = sizeOf(e, mm) || { w: 0, h: 0 }; return { x: e.x || 0, y: e.y || 0, w: s.w, h: s.h };
+    }
+    function drawGid(ctx, gid, px, py, s) {
+      const g = api.clearGid(gid); const ts = api.tilesetForGid(g);
+      if (!ts || !ts.url) return;
+      const img = api.getImageCache().get(ts.url); if (!img) return;
+      const local = g - ts.firstgid, cols = ts.columns || 1, tW = ts.tileWidth || 16, tH = ts.tileHeight || 16;
+      ctx.drawImage(img, (local % cols) * tW, Math.floor(local / cols) * tH, tW, tH, px, py, tW * s, tH * s);
+    }
+    function clear() {
+      if (back) { back.remove(); back = null; }
+      cvs.style.marginLeft = ''; cvs.style.marginTop = ''; cvs.style.position = ''; cvs.style.zIndex = '';
+    }
+    function paint() {
+      const m = state.map, w = state.world;
+      if (!m || !w || !state.worldView || (m.orientation || 'orthogonal') !== 'orthogonal' || !(w.maps || []).length) return clear();
+      const cur = (w.maps || []).find((e) => base(e.fileName) === base(state.mapFileName));
+      if (!cur) return clear();
+      const s = state.zoom;
+      const items = w.maps.map((e) => ({ e, mm: base(e.fileName) === base(state.mapFileName) ? m : state.worldMapCache.get(base(e.fileName)) }));
+      const ex = items.map((it) => extent(it.e, it.mm));
+      const curEx = extent(cur, m);
+      const minX = Math.min(...ex.map((r) => r.x)), minY = Math.min(...ex.map((r) => r.y));
+      const maxX = Math.max(...ex.map((r) => r.x + r.w)), maxY = Math.max(...ex.map((r) => r.y + r.h));
+      if (!back) { back = document.createElement('canvas'); back.id = 'worldBackdrop'; back.style.cssText = 'position:absolute;margin:0;left:0;top:0;z-index:0;pointer-events:none;image-rendering:pixelated'; wrap.insertBefore(back, cvs); }
+      back.width = Math.ceil((maxX - minX) * s); back.height = Math.ceil((maxY - minY) * s);
+      cvs.style.position = 'relative'; cvs.style.zIndex = '1';
+      cvs.style.marginLeft = (32 + (curEx.x - minX) * s) + 'px'; cvs.style.marginTop = (32 + (curEx.y - minY) * s) + 'px';
+      cvs.style.marginRight = '32px'; cvs.style.marginBottom = (32 + Math.max(0, (maxY - curEx.y - curEx.h) * s)) + 'px';
+      // 以主画布实际位置为准对齐（offsetParent 相同：canvasWrap）
+      back.style.left = (cvs.offsetLeft - (curEx.x - minX) * s) + 'px'; back.style.top = (cvs.offsetTop - (curEx.y - minY) * s) + 'px';
+      const ctx = back.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, back.width, back.height);
+      items.forEach((it, i) => {
+        const { e, mm } = it; const r = ex[i];
+        const ox = ((e.x || 0) - minX) * s, oy = ((e.y || 0) - minY) * s;
+        if (mm !== m && mm && mm.layers) {
+          ctx.globalAlpha = state.worldGhostAlpha != null ? state.worldGhostAlpha : 0.9;
+          const tw = mm.tilewidth, th = mm.tileheight;
+          const visit = (layers) => (layers || []).forEach((l) => {
+            if (l.visible === false) return;
+            if (l.type === 'group') return visit(l.layers);
+            if (l.type !== 'tilelayer') return;
+            const blocks = l.chunks ? l.chunks : [{ x: 0, y: 0, width: mm.width, height: mm.height, data: l.data }];
+            for (const c of blocks) {
+              if (!Array.isArray(c.data)) continue;
+              for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+                const gid = c.data[y * c.width + x]; if (gid) drawGid(ctx, gid, ox + (c.x + x) * tw * s, oy + (c.y + y) * th * s, s);
+              }
+            }
+          });
+          visit(mm.layers); ctx.globalAlpha = 1;
+        }
+        ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = mm === m ? 'rgba(96,165,250,.95)' : 'rgba(200,220,255,.55)';
+        ctx.strokeRect((r.x - minX) * s + .5, (r.y - minY) * s + .5, r.w * s - 1, r.h * s - 1); ctx.restore();
+        ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.font = '11px sans-serif';
+        const label = base(e.fileName) + '  (' + (e.x || 0) + ',' + (e.y || 0) + ')';
+        ctx.fillRect(ox + 2, oy + 2, ctx.measureText(label).width + 8, 15); ctx.fillStyle = '#e6eefc'; ctx.fillText(label, ox + 6, oy + 13);
+      });
+    }
+    const prev = window.__tiledAfterDraw;
+    window.__tiledAfterDraw = function (ctx, m) {
+      const wv = state.worldView; state.worldView = false; // 旧的画布内“幽灵”只剩 chunk 边框等
+      try { if (prev) prev(ctx, m); } finally { state.worldView = wv; }
+      try { paint(); } catch (e) { api.log('World 背景层绘制失败：' + e.message); }
+    };
+    F.paintWorldBackdrop = paint;
+  }
+  const start = () => (window.TiledApp ? setTimeout(() => boot(window.TiledApp), 200) : setTimeout(start, 50));
+  start();
 })();

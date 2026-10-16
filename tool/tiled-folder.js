@@ -103,10 +103,23 @@
       seen.set(path, got.file);
       if (TEXT_RE.test(path)) {
         const text = await got.file.text();
+        if (/\.world$/i.test(path)) await visitPatterns(path, text);
         for (const r of extractRefs(text, path)) {
           const p = joinPath(dirOf(path), r);
           if (p) await visit(p); else missing.push(r);
         }
+      }
+    };
+    // .world 的 patterns：上游只在 .world 同一文件夹里按正则找文件（非锚定匹配，不进子目录）
+    const visitPatterns = async (worldPath, text) => {
+      let w; try { w = JSON.parse(text); } catch (_) { return; }
+      const res = (w.patterns || []).map((p) => { try { return new RegExp(String(p.regexp || '')); } catch (_) { return null; } }).filter(Boolean);
+      if (!res.length) return;
+      const dir = dirOf(worldPath), pre = dir ? dir + '/' : '';
+      for (const p of await fs.list()) {
+        if (!p.startsWith(pre) || p.slice(pre.length).includes('/')) continue;
+        const name = p.slice(pre.length);
+        if (res.some((re) => re.test(name))) await visit(p);
       }
     };
     await visit(mapPath);

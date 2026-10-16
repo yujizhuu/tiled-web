@@ -881,8 +881,11 @@
       state.world = world;
       state.worldFiles = new Map();
       Array.from(files || []).forEach((f) => state.worldFiles.set(f.name, f));
+      // patterns：加载即按正则收图（上游 World::allMaps），收到的图追加到 maps（带 fromPattern，导出时不写回）
+      const nPat = F.expandWorldPatterns ? F.expandWorldPatterns() : 0;
+      if (nPat) api.log('World patterns 收到 ' + nPat + ' 张图');
       renderWorldPanel();
-      api.status('已加载 World：' + ((world.maps || []).length) + ' 地图');
+      api.status('已加载 World：' + ((world.maps || []).length) + ' 地图' + (nPat ? '（其中 patterns ' + nPat + '）' : ''));
       api.log('World：' + file.name);
       // auto-open first map if available
       const first = (world.maps || [])[0];

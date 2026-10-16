@@ -357,11 +357,13 @@ const TOOLS = [
   },
   {
     name: 'tiled_world',
-    description: 'World info|new|add-map|remove-map',
+    description: 'World info|new|add-map|remove-map|add-pattern|remove-pattern (info returns resolvedMaps incl. pattern matches)',
     inputSchema: {
       type: 'object',
       properties: {
-        subcommand: { type: 'string', enum: ['info', 'new', 'add-map', 'remove-map'] },
+        subcommand: { type: 'string', enum: ['info', 'new', 'add-map', 'remove-map', 'add-pattern', 'remove-pattern'] },
+        regexp: { type: 'string' }, multiplierX: { type: 'number' }, multiplierY: { type: 'number' },
+        offsetX: { type: 'number' }, offsetY: { type: 'number' }, mapWidth: { type: 'number' }, mapHeight: { type: 'number' },
         world: { type: 'string' },
         file: { type: 'string' },
         x: { type: 'number' },
@@ -385,6 +387,9 @@ const TOOLS = [
       if (a.width != null) args.push('--width', String(a.width));
       if (a.height != null) args.push('--height', String(a.height));
       if (a.index != null) args.push('--index', String(a.index));
+      if (a.regexp) args.push('--regexp', a.regexp);
+      for (const [k, f] of [['multiplierX', 'multiplier-x'], ['multiplierY', 'multiplier-y'], ['offsetX', 'offset-x'], ['offsetY', 'offset-y'], ['mapWidth', 'map-width'], ['mapHeight', 'map-height']])
+        if (a[k] != null) args.push('--' + f, String(a[k]));
       if (a.output) args.push('-o', a.output);
       return args;
     },

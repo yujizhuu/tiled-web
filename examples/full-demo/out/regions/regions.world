@@ -1,0 +1,15 @@
+{
+  "type": "world",
+  "maps": [],
+  "patterns": [
+    {
+      "regexp": "region_(\\d+)_(\\d+)\\.tmj",
+      "multiplierX": 160,
+      "multiplierY": 160,
+      "offsetX": -240,
+      "offsetY": -160,
+      "mapWidth": 160,
+      "mapHeight": 160
+    }
+  ]
+}
