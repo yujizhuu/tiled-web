@@ -4,7 +4,9 @@
 
 > **声明：** 本项目与官方 Tiled / mapeditor.org 无关，不包含 Qt 插件宿主。Tiled 名称归其原作者所有。
 
-## 快速开始
+**分工：** 网页 UI 给人用；终端 CLI 给 agent / 自动化用（见下方）。
+
+## 快速开始（网页）
 
 需要本机已安装 Python 3。
 
@@ -18,7 +20,57 @@ cd tiled-web
 
 macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
-## 功能概览（相对 Tiled 1.2.4）
+## CLI（Phase 1 · Agent 用）
+
+无界面时可用命令行创建 / 查看 / 导出地图。需要 **Node.js 18+**。当前 **不是** 完整编辑器对等，只覆盖建图与格式转换。
+
+### 安装
+
+```bash
+cd cli
+# 直接跑（无需安装依赖，零 npm 包）
+node bin/tiled-web.js version
+
+# 或链到 PATH
+npm link
+tiled-web version
+```
+
+### 命令
+
+| 命令 | 作用 |
+|------|------|
+| `tiled-web version` | 版本与阶段 |
+| `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] -o map.tmj` | 新建正交空瓦片层地图 |
+| `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
+| `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID |
+
+错误写 stderr，成功数据写 stdout；失败非零退出码。
+
+### Agent 工作流示例
+
+```bash
+cd cli
+node bin/tiled-web.js new --width 32 --height 24 --tilewidth 16 --tileheight 16 -o /tmp/level.tmj
+node bin/tiled-web.js info /tmp/level.tmj
+node bin/tiled-web.js export /tmp/level.tmj -f tmx -o /tmp/level.tmx
+node bin/tiled-web.js export /tmp/level.tmj -f csv -o /tmp/level.csv
+```
+
+自检：
+
+```bash
+cd cli && ./test_smoke.sh
+```
+
+### CLI 路线图（尚未实现）
+
+- **Phase 1（当前）：** `new` / `info` / `export`（TMJ · 最小 TMX · CSV）
+- **Phase 2：** 图层与瓦片写入（`set-tile`、填矩形、读/写单层）
+- **Phase 3：** 对象层、属性、图块集引用
+- **Phase 4：** 自动地图 / 地形批处理；可选 MCP 包装
+
+## 功能概览（相对 Tiled 1.2.4 · 网页）
 
 在「不依赖 Qt 插件」的前提下，已具备可用对等：
 
@@ -49,8 +101,14 @@ tiled-web/
 ├── start.sh          # 跨平台启动（推荐）
 ├── 启动.command       # macOS 双击启动
 ├── open_url.inc.sh   # 启动脚本辅助
-├── LICENSE           # MIT
+├── LICENSE           # AGPL-3.0
+├── NOTICE
 ├── README.md
+├── cli/              # Node CLI（Phase 1）
+│   ├── bin/tiled-web.js
+│   ├── lib/
+│   ├── package.json
+│   └── test_smoke.sh
 └── tool/             # 静态站点根目录（http.server 从这个目录起）
     ├── index.html
     ├── tiled.css
@@ -68,6 +126,7 @@ tiled-web/
 
 ```bash
 cd tool && python3 test_smoke.py
+cd cli && ./test_smoke.sh
 ```
 
 ## 许可证

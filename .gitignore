@@ -13,3 +13,4 @@ __pycache__/
 node_modules/
 dist/
 .cache/
+cli/tmp_smoke/
