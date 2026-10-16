@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tiled 网页版</title>
+  <link rel="stylesheet" href="tiled.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">▦</span><span>Tiled 网页版</span><small>1.2.4</small></div>
+    <div class="toolbar" role="toolbar" aria-label="编辑工具">
+      <button data-action="new" title="新建地图">新建</button>
+      <button data-action="open" title="打开 TMJ、TMX 或 TSJ">打开</button>
+      <button data-action="save" title="导出 TMJ">保存</button>
+      <button data-action="save-tmx" title="导出 TMX">TMX</button>
+      <button data-action="save-csv" title="导出当前瓦片层 CSV">CSV</button>
+      <button data-action="export-png" title="导出 PNG">PNG</button>
+      <span class="sep"></span>
+      <button data-action="undo" title="撤销">↶</button>
+      <button data-action="redo" title="重做">↷</button>
+      <span class="sep"></span>
+      <button data-tool="select" class="tool active" title="选择">⌁</button>
+      <button data-tool="pencil" class="tool" title="铅笔">✎</button>
+      <button data-tool="eraser" class="tool" title="橡皮">⌫</button>
+      <button data-tool="bucket" class="tool" title="填充">▧</button>
+      <button data-tool="tile-select" class="tool" title="矩形选取">▨</button>
+      <button data-tool="rect" class="tool" title="矩形对象">□</button>
+      <button data-tool="ellipse" class="tool" title="椭圆对象">○</button>
+      <button data-tool="polyline" class="tool" title="折线对象">⌁</button>
+      <button data-tool="point" class="tool" title="点对象">·</button>
+      <button data-tool="text" class="tool" title="文本对象">T</button>
+      <button data-tool="polygon" class="tool" title="多边形对象">⬠</button>
+      <button data-tool="tile-object" class="tool" title="图块对象">▣</button>
+      <span class="sep"></span>
+      <button data-action="automap" title="应用自动地图规则">自动地图</button>
+      <button data-action="toggle-live-automap" title="绘制时实时自动地图">实时自动地图</button>
+      <button data-tool="terrain" class="tool" title="地形笔刷">地形</button>
+      <button data-tool="wang" class="tool" title="Wang 笔刷">Wang</button>
+      <button data-action="wang-fill" title="WangFiller 区域填充">Wang填充</button>
+      <button data-action="terrain-mark" title="在图块集上标记地形角">标角</button>
+      <button data-action="automap-browser" title="规则浏览/预览">规则浏览</button>
+      <button data-action="rule-edit" title="编辑/新建自动地图规则">规则编辑</button>
+      <button data-action="bind-assets" title="绑定地图资源目录">资源目录</button>
+      <button data-action="load-world" title="打开 .world">World</button>
+      <button data-action="object-types" title="对象类型">对象类型</button>
+      <button data-action="property-types" title="属性类型 propertytypes">属性类型</button>
+      <button data-action="chunk-panel" title="无限地图 chunk">Chunks</button>
+      <button data-action="world-view-toggle" title="World 并排预览">World视图</button>
+      <button data-action="preferences" title="首选项">首选项</button>
+      <button data-action="templates" title="对象模板">模板</button>
+      <button data-action="world-editor" title="World 共享相机编辑">World编辑</button>
+      <button data-action="cli-help" title="浏览器 CLI 帮助">CLI</button>
+      <button data-action="edit-collision" title="编辑当前图块碰撞">碰撞编辑</button>
+      <button data-action="grid" title="显示网格">网格</button>
+      <button data-action="collision" title="显示图块碰撞">碰撞</button>
+      <label class="zoom">缩放 <input id="zoom" type="range" min="25" max="400" value="100"><output id="zoomValue">100%</output></label>
+    </div>
+    <div id="status" class="status">就绪</div>
+  </header>
+  <main class="workbench">
+    <aside class="left-panel">
+      <section class="panel-section layers-section">
+        <div class="section-head"><span>图层</span><span class="section-actions"><button data-action="add-layer" title="添加瓦片层">＋</button><button data-action="add-object-layer" title="添加对象层">◇</button><button data-action="add-group-layer" title="添加组层">▤</button><button data-action="move-layer-up" title="图层上移">↑</button><button data-action="move-layer-down" title="图层下移">↓</button><button data-action="remove-layer" title="删除图层">−</button></span></div>
+        <div id="layers" class="layer-list"></div>
+        <div class="layer-opacity"><label>不透明度 <input id="layerOpacity" type="range" min="0" max="100" value="100"><output id="layerOpacityValue">100%</output></label></div>
+        <div class="props-panel" data-props-for="layer"><div class="props-head">图层属性 <button type="button" data-props-add="layer">＋</button></div><div id="layerPropsList" class="props-list"></div><details class="props-json"><summary>JSON</summary><textarea id="layerProperties" rows="2" placeholder="{ }"></textarea></details></div>
+      </section>
+      <section class="panel-section map-section">
+        <div class="section-head"><span>地图</span></div>
+        <div class="property-grid">
+          <label>宽 <input id="mapWidth" type="number" min="1"></label>
+          <label>高 <input id="mapHeight" type="number" min="1"></label>
+          <label>图块宽 <input id="tileWidth" type="number" min="1"></label>
+          <label>图块高 <input id="tileHeight" type="number" min="1"></label>
+          <label class="wide">投影 <select id="orientation"><option value="orthogonal">正交</option><option value="isometric">等距</option><option value="staggered">交错</option><option value="hexagonal">六边形</option></select></label>
+          <label class="wide">六边边长 <input id="hexsidelength" type="number" min="0" value="0" title="hexsidelength，0 表示用默认 3/4 步距"></label>
+        </div>
+        <div class="props-panel" data-props-for="map"><div class="props-head">地图属性 <button type="button" data-props-add="map">＋</button></div><div id="mapPropsList" class="props-list"></div><details class="props-json"><summary>JSON</summary><textarea id="mapProperties" rows="2" placeholder="{ }"></textarea></details></div>
+      </section>
+      <section class="panel-section objects-section">
+        <div class="section-head"><span>对象属性</span></div>
+        <div id="objectInspector" class="inspector empty">选择对象后编辑属性</div>
+      </section>
+    </aside>
+    <section class="canvas-shell">
+      <div class="canvas-wrap" id="canvasWrap"><canvas id="canvas"></canvas><div class="canvas-empty" id="emptyHint">新建地图，或打开一个 TMJ / TMX 文件</div></div>
+      <footer class="canvas-footer"><span id="cursorPos">x: —  y: —</span><span id="mapInfo"></span><span id="selectionInfo"></span></footer>
+    </section>
+    <aside class="right-panel">
+      <section class="panel-section tileset-section">
+        <div class="section-head"><span>图块集</span><span class="section-actions"><button data-action="add-tileset" title="载入图块图片">＋</button></span></div>
+        <div class="tileset-file"><input id="tilesetInput" type="file" accept="image/*,.tsx,.tsj,.json" multiple><label for="tilesetInput">载入 TSX / TSJ / PNG 图块集</label></div>
+        <div id="tilesetMeta" class="tileset-meta">尚未载入图块集</div>
+        <div class="tileset-meta" style="opacity:.75">快捷键：X/Y 翻转 · Z 旋转印章 · 1-9 召回 · Ctrl+1-9 存印章</div>
+        <div id="tileset" class="tileset-grid"></div>
+        <div class="props-panel" data-props-for="tile"><div class="props-head">图块属性 <button type="button" data-props-add="tile">＋</button></div><div id="tilePropsList" class="props-list"></div><details class="props-json"><summary>JSON</summary><textarea id="tileProperties" rows="2" placeholder="{ }"></textarea></details></div>
+        <label class="tile-properties">碰撞对象(JSON)<textarea id="tileCollision" rows="3" placeholder="{ &quot;objects&quot;: [] }"></textarea></label>
+      </section>
+      
+      <section class="panel-section terrain-section" id="terrainSection">
+        <div class="section-head"><span>地形</span></div>
+        <div class="terrain-mode">模式
+          <select id="terrainMode"><option value="tile">整砖 PaintTile</option><option value="vertex">顶点 PaintVertex</option></select>
+        </div>
+        <div id="terrainPanel" class="terrain-panel">载入含 terraintypes 的图块集后可选地形</div>
+      </section>
+      <section class="panel-section wang-section">
+        <div class="section-head"><span>Wang 色</span></div>
+        <div id="wangPanel" class="terrain-panel">载入含 wangsets 的图块集后可选</div>
+        <div id="wangTemplatePanel" class="wang-templates"></div>
+        <div class="terrain-mode">Wang 模式
+          <select id="wangMode"><option value="corner">角 PaintVertex</option><option value="edge">边 PaintEdge</option></select>
+        </div>
+      </section>
+      <section class="panel-section automap-section">
+        <div class="section-head"><span>自动地图</span></div>
+        <div class="tileset-file"><input id="automapInput" type="file" accept=".txt,.tmx,.tmj,.json,image/*" multiple><label for="automapInput">载入 rules.txt + 规则地图</label></div>
+        <div id="automapMeta" class="tileset-meta">尚未载入规则</div>
+      </section>
+      <section class="panel-section world-section" id="worldSection">
+        <div class="section-head"><span>World</span></div>
+        <div id="worldPanel" class="tileset-meta">未加载 .world</div>
+      </section>
+      <section class="panel-section console-section">
+        <div class="section-head"><span>输出</span><button data-action="clear-log" title="清空输出">清空</button></div>
+        <pre id="console" class="console"></pre>
+      </section>
+    </aside>
+  </main>
+  <div id="ruleEditor" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner rule-editor-inner">
+      <header>
+        <span>自动地图规则编辑</span>
+        <span class="rule-editor-actions">
+          <button type="button" data-action="rule-export-tmj">导出 TMJ</button>
+          <button type="button" data-action="rule-export-tmx">导出 TMX</button>
+          <button type="button" data-action="rule-apply-session">加入会话规则</button>
+          <button type="button" data-action="close-rule-edit">关闭</button>
+        </span>
+      </header>
+      <div class="rule-editor-toolbar">
+        <label>层 <select id="ruleLayerSelect"></select></label>
+        <button type="button" data-rule-tool="paint" class="active">绘制</button>
+        <button type="button" data-rule-tool="erase">擦除</button>
+        <button type="button" data-action="rule-add-input">＋input</button>
+        <button type="button" data-action="rule-add-output">＋output</button>
+        <button type="button" data-action="rule-add-objout">＋对象输出</button>
+        <label>GID <input id="rulePaintGid" type="number" min="0" value="1" style="width:64px"></label>
+        <label>宽 <input id="ruleMapW" type="number" min="1" value="8" style="width:48px"></label>
+        <label>高 <input id="ruleMapH" type="number" min="1" value="8" style="width:48px"></label>
+        <button type="button" data-action="rule-resize">调整尺寸</button>
+        <button type="button" data-action="rule-attach-tileset">规则图块集</button>
+        <input id="ruleTilesetInput" type="file" accept="image/*,.tsx,.tsj,.json" hidden>
+      </div>
+      <canvas id="ruleCanvas" width="384" height="384"></canvas>
+      <p class="collision-hint">先画 Regions，再画 input_* / output_*；空单元语义遵循 StrictEmpty。对象输出层可点「＋对象输出」后用 GID=0 空刷仅占位，再用导出后在桌面补对象，或在下方添加简单矩形对象。</p>
+      <div class="rule-obj-tools">
+        <button type="button" data-action="rule-add-rect-obj">矩形</button>
+        <button type="button" data-action="rule-add-ellipse-obj">椭圆</button>
+        <button type="button" data-action="rule-add-point-obj">点</button>
+        <button type="button" data-action="rule-add-poly-obj">多边形</button>
+        <button type="button" data-action="rule-add-tile-obj">图块对象</button>
+        <label>对象类型 <input id="ruleObjType" style="width:80px" placeholder="NPC"></label>
+      </div>
+    </div>
+  </div>
+  <div id="automapBrowser" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner automap-browser-inner">
+      <header><span>自动地图规则浏览</span><button type="button" data-action="close-automap-browser">关闭</button></header>
+      <div class="automap-browser-body">
+        <aside id="automapRuleList" class="automap-rule-list"></aside>
+        <div><canvas id="automapPreview" width="320" height="240"></canvas><p id="automapPreviewMeta" class="collision-hint"></p></div>
+      </div>
+    </div>
+  </div>
+  <div id="prefsEditor" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner" style="min-width:440px;max-width:92vw">
+      <header><span>首选项</span>
+        <span>
+          <button type="button" data-action="prefs-reset">恢复默认</button>
+          <button type="button" data-action="close-prefs">关闭</button>
+        </span>
+      </header>
+      <div class="prefs-grid" id="prefsForm"></div>
+      <p class="collision-hint">设置保存在浏览器 localStorage。语言固定为中文。Qt 插件/脚本宿主不可用（浏览器永久限制）。</p>
+      <div class="section-head" style="margin-top:8px"><span>最近文件</span><button type="button" data-action="prefs-clear-recent">清空</button></div>
+      <div id="recentFilesList" class="props-list"></div>
+    </div>
+  </div>
+  <div id="templatesPanel" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner" style="min-width:520px;max-width:95vw">
+      <header><span>对象模板</span>
+        <span>
+          <button type="button" data-action="tpl-save-selected">选中对象另存为模板</button>
+          <button type="button" data-action="close-templates">关闭</button>
+        </span>
+      </header>
+      <div class="tileset-file">
+        <input id="templateInput" type="file" accept=".tx,.tj,.json,application/json,text/xml" multiple>
+        <label for="templateInput">多选载入 .tx / JSON</label>
+      </div>
+      <div class="rule-editor-toolbar" style="margin:6px 0">
+        <button type="button" data-action="tpl-bind-dir">绑定模板目录</button>
+        <button type="button" data-action="tpl-refresh-dir">刷新目录</button>
+        <input id="templateSearch" type="search" placeholder="搜索模板…" style="flex:1;min-width:120px">
+      </div>
+      <div class="automap-browser-body">
+        <aside id="templateList" class="automap-rule-list"></aside>
+        <div>
+          <canvas id="templatePreview" width="240" height="180"></canvas>
+          <p id="templateMeta" class="collision-hint"></p>
+          <button type="button" data-action="tpl-insert-tool">插入模板工具 (V)</button>
+          <button type="button" data-action="tpl-detach">分离选中实例</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="propertyTypesEditor" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner" style="min-width:480px">
+      <header><span>属性类型 (propertytypes)</span>
+        <span>
+          <button type="button" data-action="pt-add-enum">＋枚举</button>
+          <button type="button" data-action="pt-add-class">＋类</button>
+          <button type="button" data-action="pt-export">导出 JSON</button>
+          <button type="button" data-action="close-property-types">关闭</button>
+        </span>
+      </header>
+      <div class="tileset-file"><input id="propertyTypesInput" type="file" accept=".json,application/json"><label for="propertyTypesInput">载入 propertytypes.json</label></div>
+      <p class="collision-hint">1.2.4 地图内嵌 propertytypes 已废弃；此处提供工程级枚举/类定义（向前兼容），并与对象类型、类型化属性面板联动。</p>
+      <div id="propertyTypesList" class="props-list"></div>
+    </div>
+  </div>
+  <div id="chunkPanel" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner" style="min-width:360px">
+      <header><span>无限地图 Chunks</span>
+        <span>
+          <button type="button" data-action="toggle-infinite">切换无限</button>
+          <button type="button" data-action="prune-chunks">清理空块</button>
+          <button type="button" data-action="close-chunk-panel">关闭</button>
+        </span>
+      </header>
+      <div id="chunkList" class="props-list"></div>
+      <p class="collision-hint">绘制到空白区域会自动创建 16×16 chunk；橡皮不会新建空块。开启「显示网格」时可看到 chunk 边界。</p>
+    </div>
+  </div>
+  <div id="objectTypesEditor" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner" style="min-width:420px">
+      <header><span>对象类型</span>
+        <span>
+          <button type="button" data-action="ot-add">＋类型</button>
+          <button type="button" data-action="ot-export">导出 JSON</button>
+          <button type="button" data-action="close-object-types">关闭</button>
+        </span>
+      </header>
+      <div class="tileset-file"><input id="objectTypesInput" type="file" accept=".json,.xml,application/json,text/xml"><label for="objectTypesInput">载入 objecttypes.json / xml</label></div>
+      <div id="objectTypesList" class="props-list"></div>
+    </div>
+  </div>
+  <div id="collisionEditor" class="collision-editor hidden" aria-hidden="true">
+    <div class="collision-editor-inner">
+      <header><span>图块碰撞编辑</span><button type="button" data-action="close-collision">关闭</button></header>
+      <div class="collision-toolbar">
+        <button type="button" data-coltool="select" class="active">选择</button>
+        <button type="button" data-coltool="rect">矩形</button>
+        <button type="button" data-coltool="ellipse">椭圆</button>
+        <button type="button" data-coltool="polygon">多边形</button>
+        <button type="button" data-coltool="polyline">折线</button>
+        <button type="button" data-coltool="vertex">改顶点</button>
+        <button type="button" data-coltool="delete">删除</button>
+        <button type="button" data-action="collision-import" title="从当前对象层导入">导入对象层</button>
+        <label class="snap-label"><input type="checkbox" id="collisionSnap" checked> 网格吸附</label>
+      </div>
+      <canvas id="collisionCanvas" width="256" height="256"></canvas>
+      <p class="collision-hint">矩形/椭圆拖拽；多边形/折线单击加点，双击或 Enter 结束；「改顶点」拖动控制点</p>
+    </div>
+  </div>
+  <input id="worldInput" type="file" accept=".world,application/json" hidden>
+  <input id="mapInput" type="file" accept=".tmj,.json,.tmx,.tsx,.tsj,.csv,.world,.tx,.tj,image/*,application/json,text/xml" multiple hidden>
+  <script src="pako.min.js"></script>
+  <script src="tiled.js"></script>
+  <script src="tiled-features.js"></script>
+  <script src="tiled-parity.js"></script>
+  <script src="tiled-batch3.js"></script>
+  <script src="tiled-batch4.js"></script>
+  <script src="tiled-batch5.js"></script>
+  <script src="tiled-batch6.js"></script>
+  <script src="tiled-batch7.js"></script>
+</body>
+</html>

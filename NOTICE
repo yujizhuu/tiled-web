@@ -1,0 +1,7 @@
+Third-party software
+====================
+
+pako (tool/pako.min.js)
+  zlib/inflate helpers used for TMX/TMJ compression.
+  Upstream: https://github.com/nodeca/pako
+  License: MIT (see upstream repository)
