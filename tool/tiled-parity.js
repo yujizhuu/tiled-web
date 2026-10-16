@@ -496,7 +496,7 @@
             state.wangMode = isEdge ? 'edge' : 'corner';
             if ($('#wangMode')) $('#wangMode').value = state.wangMode;
             state.tool = 'wang';
-            document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === 'wang'));
+            if (api.syncToolActive) api.syncToolActive('wang'); else document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === 'wang'));
             api.status('Wang：' + (c.name || i + 1));
           };
           panel.appendChild(chip);
@@ -782,7 +782,9 @@
     document.querySelectorAll('[data-tool="wang"]').forEach((b) => {
       b.onclick = () => {
         state.tool = 'wang';
-        document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x === b));
+        if (api.setToolMode) api.setToolMode('tile', { keepTool: true });
+        else if (api.syncToolActive) api.syncToolActive('wang');
+        else document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x.dataset.tool === 'wang'));
         renderWangPanel();
         api.status('工具：Wang 笔刷');
       };

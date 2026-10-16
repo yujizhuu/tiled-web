@@ -874,7 +874,10 @@
         state.stampData = [];
         for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) state.stampData.push(tileAt(l, x, y, state.map));
         state.tileSelection = { x: 0, y: 0, w, h };
-        state.tool = 'pencil'; document.querySelector('[data-tool="pencil"]').click();
+        state.tool = 'pencil';
+        setToolMode('tile', { keepTool: true });
+        const pencilBtn = document.querySelector('[data-tool-group="tile"] [data-tool="pencil"]') || document.querySelector('[data-tool="pencil"]');
+        if (pencilBtn) pencilBtn.click();
         status(`已选取地图印章 ${w}×${h}`);
       }
       renderAll(); return;
@@ -1450,6 +1453,55 @@
     status('已导出 CSV'); log('导出当前瓦片层 CSV');
   }
 
+  const TOOL_MODE_KEY = 'tiled-web-tool-mode';
+  const TILE_TOOLS = new Set(['select', 'pencil', 'eraser', 'bucket', 'tile-select', 'terrain', 'wang']);
+  const OBJECT_ONLY_TOOLS = new Set(['rect', 'ellipse', 'polyline', 'point', 'text', 'polygon', 'tile-object']);
+
+  function currentToolMode() {
+    const active = document.querySelector('[data-tool-mode].active');
+    return active ? active.dataset.toolMode : 'tile';
+  }
+
+  function syncToolActive(toolName) {
+    document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x.dataset.tool === toolName));
+    document.querySelectorAll('.tb-menu').forEach((menu) => {
+      const hasActive = !!menu.querySelector('[data-tool].active');
+      menu.classList.toggle('has-active-tool', hasActive);
+    });
+  }
+
+  function setToolMode(mode, opts = {}) {
+    mode = mode === 'object' ? 'object' : 'tile';
+    document.querySelectorAll('[data-tool-mode]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.toolMode === mode);
+    });
+    document.querySelectorAll('[data-tool-group]').forEach((g) => {
+      g.hidden = g.dataset.toolGroup !== mode;
+    });
+    try { localStorage.setItem(TOOL_MODE_KEY, mode); } catch (_) {}
+    if (!opts.keepTool) {
+      if (mode === 'tile' && OBJECT_ONLY_TOOLS.has(state.tool)) {
+        state.tool = 'pencil';
+        syncToolActive('pencil');
+        status('工具：铅笔');
+      } else if (mode === 'object' && TILE_TOOLS.has(state.tool) && state.tool !== 'select') {
+        state.tool = 'select';
+        syncToolActive('select');
+        status('工具：选择');
+      } else {
+        syncToolActive(state.tool);
+      }
+    } else {
+      syncToolActive(state.tool);
+    }
+  }
+
+  function applyZoomPercent(pct) {
+    const v = Math.max(25, Math.min(400, Math.round(pct)));
+    els.zoom.value = String(v);
+    els.zoom.dispatchEvent(new Event('input'));
+  }
+
   function closeToolbarMenus(except) {
     document.querySelectorAll('.tb-menu.open').forEach((menu) => {
       if (except && menu === except) return;
@@ -1512,16 +1564,31 @@
       else if (a === 'remove-layer') removeLayer();
       else if (a === 'add-tileset') els.tilesetInput.click();
       else if (a === 'clear-log') els.console.textContent = '';
+      else if (a === 'zoom-in') applyZoomPercent(Number(els.zoom.value) + 10);
+      else if (a === 'zoom-out') applyZoomPercent(Number(els.zoom.value) - 10);
+      else if (a === 'zoom-reset') applyZoomPercent(100);
+    });
+    document.querySelectorAll('[data-tool-mode]').forEach((b) => {
+      b.onclick = () => setToolMode(b.dataset.toolMode);
     });
     document.querySelectorAll('[data-tool]').forEach((b) => b.onclick = () => {
-      state.tool = b.dataset.tool;
-      document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x === b));
-      document.querySelectorAll('.tb-menu').forEach((menu) => {
-        const hasActive = !!menu.querySelector('[data-tool].active');
-        menu.classList.toggle('has-active-tool', hasActive);
-      });
-      status(`工具：${b.title}`);
+      const tool = b.dataset.tool;
+      state.tool = tool;
+      if (OBJECT_ONLY_TOOLS.has(tool)) setToolMode('object', { keepTool: true });
+      else if (tool === 'terrain' || tool === 'wang' || tool === 'pencil' || tool === 'eraser' || tool === 'bucket' || tool === 'tile-select') {
+        setToolMode('tile', { keepTool: true });
+      } else {
+        syncToolActive(tool);
+      }
+      status(`工具：${b.title || tool}`);
     });
+    try {
+      const savedMode = localStorage.getItem(TOOL_MODE_KEY);
+      if (savedMode === 'object' || savedMode === 'tile') setToolMode(savedMode, { keepTool: true });
+      else setToolMode('tile', { keepTool: true });
+    } catch (_) {
+      setToolMode('tile', { keepTool: true });
+    }
     bindToolbarMenus();
     els.mapInput.onchange = () => els.mapInput.files[0] && openFile(els.mapInput.files[0], els.mapInput.files);
     els.tilesetInput.onchange = () => loadTiles(els.tilesetInput.files).catch((err) => { status('载入失败'); log(err.message); });
@@ -1631,8 +1698,16 @@
         state.stampTransform.rotate = (state.stampTransform.rotate + 90) % 360;
         status(`图块印章：旋转 ${state.stampTransform.rotate}°`); renderTileset();
       }
-      if (e.key === 'b' && !typing) document.querySelector('[data-tool="pencil"]').click();
-      if (e.key === 'e' && !typing) document.querySelector('[data-tool="eraser"]').click();
+      if (e.key === 'b' && !typing) {
+        setToolMode('tile', { keepTool: true });
+        const btn = document.querySelector('[data-tool-group="tile"] [data-tool="pencil"]') || document.querySelector('[data-tool="pencil"]');
+        if (btn) btn.click();
+      }
+      if (e.key === 'e' && !typing) {
+        setToolMode('tile', { keepTool: true });
+        const btn = document.querySelector('[data-tool-group="tile"] [data-tool="eraser"]') || document.querySelector('[data-tool="eraser"]');
+        if (btn) btn.click();
+      }
     });
   }
 
@@ -1654,6 +1729,7 @@
     parseTerrainTypes, parseTileTerrainAttr, parseWangSets, xmlEscape, propertiesXml, objectXml, download, stripPropMeta, xmlProperties,
     openFile, loadTiles, attachMapTileset, attachMapImages, readImage, save, saveTmx, saveCsv, exportPng,
     beginPaintStroke, endPaintStroke, snapWorldPixel,
+    setToolMode, syncToolActive, applyZoomPercent,
     getState: () => state,
     getEls: () => els,
     getTilesetRegistry: () => tilesetRegistry,

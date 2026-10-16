@@ -147,7 +147,7 @@
           state.selectedTerrainId = t.id;
           state.terrainTileset = ts;
           state.tool = 'terrain';
-          document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === 'terrain'));
+          if (api.syncToolActive) api.syncToolActive('terrain'); else document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === 'terrain'));
           renderTerrainPanel();
           api.status('地形：' + t.name);
         };
@@ -880,7 +880,9 @@
     document.querySelectorAll('[data-tool="terrain"]').forEach((b) => {
       b.onclick = () => {
         state.tool = 'terrain';
-        document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x === b));
+        if (api.setToolMode) api.setToolMode('tile', { keepTool: true });
+        else if (api.syncToolActive) api.syncToolActive('terrain');
+        else document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x.dataset.tool === 'terrain'));
         api.status('工具：地形笔刷');
         renderTerrainPanel();
       };
