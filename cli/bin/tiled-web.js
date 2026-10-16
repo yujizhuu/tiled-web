@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 3 (objects / properties / richer tilesets + Phase 1–2)
+ * tiled-web CLI — Phase 4 (automap / world / replace-gid + Phase 1–3)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -34,11 +34,22 @@ const {
 } = require('../lib/objects');
 const { listProps, getProp, setProp, removeProp, resolveOwner } = require('../lib/props');
 const { applyFlipFlags, decodeGid } = require('../lib/gid');
+const { applyAutomapToMap } = require('../lib/automap');
+const {
+  emptyWorld,
+  loadWorld,
+  saveWorld,
+  worldInfo,
+  addMap: worldAddMap,
+  removeMap: worldRemoveMap,
+  relativizeMapFile,
+} = require('../lib/world');
+const { replaceGid } = require('../lib/replace');
 
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 3 CLI (objects / properties / tilesets)
+  const text = `tiled-web ${PKG.version} — Phase 4 CLI (automap / world / replace-gid)
 
 Usage:
   tiled-web version
@@ -51,6 +62,7 @@ Usage:
   tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer name|index]
                  [--flip-h] [--flip-v] [--flip-d] [-o out]
   tiled-web get-layer <map> [--layer name|index] [--format json|csv] [-o out]
+  tiled-web replace-gid <map> --from GID --to GID [--layer name|index] [--match-flips] [-o out]
 
   tiled-web layer list <map>
   tiled-web layer add <map> [--name NAME] [--type tile|object] [-o out]
@@ -74,12 +86,20 @@ Usage:
   tiled-web prop set  <map> --target ... --name KEY --value VAL [--type string|int|float|bool] [-o out]
   tiled-web prop remove <map> --target ... --name KEY [-o out]
 
+  tiled-web automap <map> --rules <rules.txt|rules.json|dir|rule.tmj> [-o out]
+
+  tiled-web world info <file.world>
+  tiled-web world new -o file.world
+  tiled-web world add-map <file.world> --file map.tmj --x X --y Y [--width W] [--height H]
+  tiled-web world remove-map <file.world> --file map.tmj|--index N
+
 Notes:
   - Mutations write in-place unless -o / --output is set.
   - Default --layer for tile cmds is the first tile layer.
   - Object identity for prop --target object: --layer + --id (or --object-name).
+  - Automap: Tiled-style Regions + Input_*/Output_* (see fixtures/automap/); subset vs browser.
   - TMX support is minimal orthogonal (CSV data).
-  - Browser UI under tool/ is unchanged.
+  - Browser UI under tool/ is unchanged. MCP wrapper is optional future.
 
 Exit: 0 on success; non-zero on error (messages on stderr).
 `;
@@ -130,7 +150,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 3 (objects/properties/tilesets + layers/tiles + create/info/export)\n`);
+  process.stdout.write(`phase: 4 (automap/world/replace-gid + objects/props/layers/tiles + create/info/export)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -498,6 +518,98 @@ function cmdProp(positional, flags) {
   die(`Unknown prop subcommand: ${sub} (use list|get|set|remove)`);
 }
 
+
+function cmdReplaceGid(positional, flags) {
+  const file = positional[0];
+  if (!file) die('replace-gid requires a map path');
+  if (flags.from == null || flags.from === true) die('replace-gid requires --from <gid>');
+  if (flags.to == null || flags.to === true) die('replace-gid requires --to <gid>');
+  const map = loadMap(file);
+  const result = replaceGid(map, {
+    from: flags.from,
+    to: flags.to,
+    layer: flags.layer,
+    matchFlips: !!(flags['match-flips'] || flags.matchFlips),
+  });
+  const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+  ok({ action: 'replace-gid', ...result, ...saved });
+}
+
+function cmdAutomap(positional, flags) {
+  const file = positional[0];
+  if (!file) die('automap requires a map path');
+  const rules = flags.rules;
+  if (!rules || rules === true) die('automap requires --rules <rules.txt|rules.json|dir|rule.tmj>');
+  const map = loadMap(file);
+  const result = applyAutomapToMap(map, rules);
+  const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+  ok({
+    action: 'automap',
+    matches: result.matches,
+    ruleFiles: result.ruleFiles,
+    ruleCount: result.ruleCount,
+    warnings: result.warnings,
+    appliedSample: result.applied.slice(0, 20),
+    appliedTotal: result.applied.length,
+    ...saved,
+  });
+}
+
+function cmdWorld(positional, flags) {
+  const sub = positional[0];
+  if (!sub) die('world requires subcommand: info|new|add-map|remove-map');
+
+  if (sub === 'new') {
+    const out = flags.output;
+    if (!out) die('world new requires -o / --output <file.world>');
+    const world = emptyWorld();
+    const saved = saveWorld(world, out);
+    ok({ action: 'world-new', ...saved, mapCount: 0 });
+    return;
+  }
+
+  const file = positional[1];
+  if (!file) die(`world ${sub} requires a .world path`);
+
+  if (sub === 'info') {
+    const world = loadWorld(file);
+    process.stdout.write(JSON.stringify(worldInfo(world, file), null, 2) + '\n');
+    return;
+  }
+
+  if (sub === 'add-map' || sub === 'addmap') {
+    const world = loadWorld(file);
+    const mapFile = flags.file || flags.map;
+    if (!mapFile || mapFile === true) die('world add-map requires --file <map.tmj>');
+    if (flags.x == null || flags.x === true) die('world add-map requires --x');
+    if (flags.y == null || flags.y === true) die('world add-map requires --y');
+    const fileName = relativizeMapFile(file, String(mapFile));
+    const result = worldAddMap(world, {
+      fileName,
+      x: flags.x,
+      y: flags.y,
+      width: flags.width,
+      height: flags.height,
+    });
+    const saved = saveWorld(world, flags.output || file);
+    ok({ action: 'world-add-map', ...result, ...saved });
+    return;
+  }
+
+  if (sub === 'remove-map' || sub === 'removemap') {
+    const world = loadWorld(file);
+    const result = worldRemoveMap(world, {
+      fileName: flags.file || flags.map,
+      index: flags.index,
+    });
+    const saved = saveWorld(world, flags.output || file);
+    ok({ action: 'world-remove-map', removed: result.removed, index: result.index, ...saved });
+    return;
+  }
+
+  die(`Unknown world subcommand: ${sub} (use info|new|add-map|remove-map)`);
+}
+
 function main() {
   try {
     const { cmd, flags, positional } = parseArgs(process.argv);
@@ -541,6 +653,18 @@ function main() {
       case 'property':
       case 'props':
         cmdProp(positional, flags);
+        break;
+      case 'automap':
+      case 'auto-map':
+        cmdAutomap(positional, flags);
+        break;
+      case 'world':
+        cmdWorld(positional, flags);
+        break;
+      case 'replace-gid':
+      case 'replacegid':
+      case 'replace':
+        cmdReplaceGid(positional, flags);
         break;
       case 'help':
         usage(0);

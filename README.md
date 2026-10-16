@@ -20,9 +20,9 @@ cd tiled-web
 
 macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
-## CLI（Phase 3 · Agent 用）
+## CLI（Phase 4 · Agent 用）
 
-无界面时可用命令行创建 / 查看 / 写瓦片 / 管图层与对象 / 自定义属性 / 图块集 / 导出地图。需要 **Node.js 18+**。零 npm 依赖。当前覆盖建图、图层与瓦片写入、对象层、属性、图块集引用与格式转换（仍非完整编辑器对等）。
+无界面时可用命令行创建 / 查看 / 写瓦片 / 管图层与对象 / 自定义属性 / 图块集 / 自动地图 / World / 批量替换 GID / 导出地图。需要 **Node.js 18+**。零 npm 依赖。当前覆盖建图到批处理编辑（仍非完整编辑器对等；MCP 包装为可选后续）。
 
 ### 安装
 
@@ -40,7 +40,7 @@ tiled-web version
 
 | 命令 | 作用 |
 |------|------|
-| `tiled-web version` | 版本与阶段（0.3.0 / Phase 3） |
+| `tiled-web version` | 版本与阶段（0.4.0 / Phase 4） |
 | `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] -o map.tmj` | 新建正交空瓦片层地图 |
 | `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
 | `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID |
@@ -58,6 +58,12 @@ tiled-web version
 | `tiled-web object remove <map> --layer --id\|--name [-o out]` | 删除对象 |
 | `tiled-web object update <map> --layer --id ... [-o out]` | 更新位置 / 尺寸 / 名称 / 类型 / 形状 |
 | `tiled-web prop list\|get\|set\|remove <map> --target map\|layer\|object\|tileset ...` | 自定义属性；object 用 `--layer` + `--id`（或 `--object-name`），属性键为 `--name` |
+| `tiled-web automap <map> --rules <rules.txt\|rules.json\|dir\|rule.tmj> [-o out]` | 应用 AutoMap 规则（Regions + Input_*/Output_*）；见 `cli/fixtures/automap/` |
+| `tiled-web world info <file.world>` | 列出世界中的地图与坐标（JSON） |
+| `tiled-web world new -o file.world` | 新建空 `.world` |
+| `tiled-web world add-map <file.world> --file map.tmj --x X --y Y [--width] [--height]` | 向世界添加/更新地图条目 |
+| `tiled-web world remove-map <file.world> --file map.tmj\|--index N` | 从世界移除地图 |
+| `tiled-web replace-gid <map> --from GID --to GID [--layer] [--match-flips] [-o out]` | 批量替换瓦片 GID（地形类批处理） |
 
 错误写 stderr，成功数据写 stdout；失败非零退出码。写操作默认原地保存，可用 `-o` 另存。
 
@@ -77,6 +83,13 @@ node bin/tiled-web.js object list /tmp/level.tmj
 node bin/tiled-web.js get-layer /tmp/level.tmj --layer Ground --format csv -o /tmp/ground.csv
 node bin/tiled-web.js info /tmp/level.tmj
 node bin/tiled-web.js export /tmp/level.tmj -f tmx -o /tmp/level.tmx
+
+# Phase 4 — automap / world / replace-gid
+node bin/tiled-web.js automap fixtures/automap/work.tmj --rules fixtures/automap/rules.txt -o /tmp/auto.tmj
+node bin/tiled-web.js replace-gid /tmp/level.tmj --from 1 --to 2 --layer Ground
+node bin/tiled-web.js world new -o /tmp/demo.world
+node bin/tiled-web.js world add-map /tmp/demo.world --file /tmp/level.tmj --x 0 --y 0 --width 512 --height 384
+node bin/tiled-web.js world info /tmp/demo.world
 ```
 
 自检：
@@ -89,8 +102,14 @@ cd cli && ./test_smoke.sh
 
 - **Phase 1：** `new` / `info` / `export`（TMJ · 最小 TMX · CSV）✅
 - **Phase 2：** 图层与瓦片写入（`set-tile`、`fill`、`get-layer`、`layer *`、`tileset add|list`）✅
-- **Phase 3（当前）：** 对象层、属性、更完整的图块集引用（`.tsx` / PNG 尺寸 / GID 翻转）✅
-- **Phase 4：** 自动地图 / 地形批处理；可选 MCP 包装；world
+- **Phase 3：** 对象层、属性、更完整的图块集引用（`.tsx` / PNG 尺寸 / GID 翻转）✅
+- **Phase 4（当前）：** `automap`（规则子集）、`world *`、`replace-gid`；MCP 包装仍为可选后续 ✅
+
+#### Automap CLI 子集（相对网页）
+
+已实现：`rules.txt` / `rules.json` / 目录 / 单规则图；`Regions` + `Input_*` / `InputNot_*` / `Output_*` 瓦片层；`DeleteTiles` / `MatchOutsideMap` / `StrictEmpty`；对象层 `Output_*` 克隆。
+
+未做（网页有 / CLI 不做或后续）：实时绘制自动地图、规则可视化编辑器、`AutomappingRadius` 区域裁剪、完整 Wang/地形笔刷交互、无限地图 chunks。
 
 ## 功能概览（相对 Tiled 1.2.4 · 网页）
 
@@ -126,11 +145,13 @@ tiled-web/
 ├── LICENSE           # AGPL-3.0
 ├── NOTICE
 ├── README.md
-├── cli/              # Node CLI（Phase 3）
+├── cli/              # Node CLI（Phase 4）
 │   ├── bin/tiled-web.js
-│   ├── lib/
+│   ├── lib/            # create/load/layers/objects/props/automap/world/…
+│   ├── fixtures/automap/
 │   ├── package.json
-│   └── test_smoke.sh
+│   ├── test_smoke.sh
+│   └── test_phase4.sh
 └── tool/             # 静态站点根目录（http.server 从这个目录起）
     ├── index.html
     ├── tiled.css

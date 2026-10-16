@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 3 CLI smoke test — objects, properties, flips, tileset, plus Phase 1–2
+# Phase 1–4 CLI smoke test — automap/world + objects/props/tiles + create/info/export
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 CLI=(node "$ROOT/bin/tiled-web.js")
@@ -8,8 +8,8 @@ rm -rf "$TMP"
 mkdir -p "$TMP"
 
 echo "== version =="
-"${CLI[@]}" version | grep -q '0.3.0'
-"${CLI[@]}" version | grep -q 'phase: 3'
+"${CLI[@]}" version | grep -q '0.4.0'
+"${CLI[@]}" version | grep -q 'phase: 4'
 
 echo "== new =="
 "${CLI[@]}" new --width 8 --height 6 --tilewidth 16 --tileheight 16 -o "$TMP/map.tmj"
@@ -166,4 +166,7 @@ set -e
 test "$EC" -ne 0
 grep -qi 'cannot read\|no such' "$TMP/err.txt" || grep -qi 'ENOENT\|Cannot read' "$TMP/err.txt"
 
-echo "OK: Phase 3 CLI smoke passed"
+echo "== phase 4 =="
+"$ROOT/test_phase4.sh"
+
+echo "OK: Phase 4 CLI smoke passed"
