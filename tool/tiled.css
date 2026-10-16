@@ -172,3 +172,22 @@ button[data-action="toggle-live-automap"].active{background:var(--accent2);borde
 .section-actions button,.section-head>button{min-width:24px;padding:1px 5px;flex-shrink:0}
 .props-head{flex-wrap:wrap;gap:4px}
 .layer-opacity label{white-space:nowrap;min-width:0}.layer-opacity input{min-width:0}
+/* ===== 图块集大窗预览（0.9.3） ===== */
+.tsp{position:fixed;z-index:400;display:flex;flex-direction:column;min-width:300px;min-height:240px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);background:#1a1e26;border:1px solid #3a414e;border-radius:8px;box-shadow:0 18px 48px #000c;resize:both;overflow:hidden}
+.tsp.hidden{display:none}
+.tsp-head{display:flex;align-items:center;gap:6px;padding:6px 8px 6px 12px;border-bottom:1px solid var(--line);cursor:move;user-select:none;font-weight:600;flex-shrink:0}
+.tsp-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tsp-sp{flex:1}
+.tsp-head button{padding:2px 8px}
+.tsp-tabs{display:flex;gap:4px;padding:6px 8px 0;overflow-x:auto;flex-shrink:0}
+.tsp-tabs[hidden]{display:none}
+.tsp-tabs button{font-size:12px;white-space:nowrap;padding:3px 9px}
+.tsp-tabs button.active{background:var(--accent2);border-color:var(--accent);color:#fff}
+.tsp-bar{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;padding:6px 8px;border-bottom:1px solid var(--line);flex-shrink:0;font-size:12px}
+.tsp-bar button{padding:2px 8px;font-size:12px}
+.tsp-bar output{min-width:44px;text-align:center}
+.tsp-bar label{display:flex;align-items:center;gap:3px;color:var(--muted);white-space:nowrap}
+.tsp-body{position:relative;flex:1;min-height:0;overflow:hidden;background-color:#101217;background-image:linear-gradient(45deg,#141820 25%,transparent 25%),linear-gradient(-45deg,#141820 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#141820 75%),linear-gradient(-45deg,transparent 75%,#141820 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
+.tsp-body canvas{display:block;cursor:crosshair;touch-action:none}
+.tsp-tip{position:absolute;pointer-events:none;white-space:pre;background:#0b0d12ee;border:1px solid #3a414e;border-radius:4px;padding:5px 8px;font:11px/1.45 ui-monospace,Menlo,monospace;color:#d6deea;max-width:280px;overflow:hidden}
+.tsp-info{padding:4px 10px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
