@@ -1077,7 +1077,9 @@
         if (cs.length) {
           const x0 = Math.min(...cs.map((c) => c.x)), y0 = Math.min(...cs.map((c) => c.y));
           const x1 = Math.max(...cs.map((c) => c.x + c.width)), y1 = Math.max(...cs.map((c) => c.y + c.height));
-          return { x: e.x + x0 * mm.tilewidth, y: e.y + y0 * mm.tileheight, w: (x1 - x0) * mm.tilewidth, h: (y1 - y0) * mm.tileheight };
+          // 与 tiled.js layerChunkBounds 的画布范围一致（四周各留 2 格），否则当前无限图与世界背景错位
+          const P = 2;
+          return { x: e.x + (x0 - P) * mm.tilewidth, y: e.y + (y0 - P) * mm.tileheight, w: (x1 - x0 + 2 * P) * mm.tilewidth, h: (y1 - y0 + 2 * P) * mm.tileheight };
         }
       }
       const s = sizeOf(e, mm) || { w: 0, h: 0 }; return { x: e.x || 0, y: e.y || 0, w: s.w, h: s.h };

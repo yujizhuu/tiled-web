@@ -418,6 +418,9 @@
       }
       els.canvas.width = Math.max(64, Math.ceil(w));
       els.canvas.height = Math.max(64, Math.ceil(h));
+      // 显示尺寸必须与像素尺寸一致，否则会沿用上一张（有限）地图的 CSS 尺寸而被缩小显示
+      els.canvas.style.width = `${els.canvas.width}px`;
+      els.canvas.style.height = `${els.canvas.height}px`;
       state._infiniteDrawOffset = { x: -b.minX, y: -b.minY };
       return;
     }

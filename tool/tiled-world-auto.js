@@ -88,7 +88,7 @@
       let x = e.x || 0, y = e.y || 0;
       if (mm && mm.infinite) {
         const xs = [], ys = []; (mm.layers || []).forEach((l) => (l.chunks || []).forEach((c) => { xs.push(c.x, c.x + c.width); ys.push(c.y, c.y + c.height); }));
-        if (xs.length) return { x: x + Math.min(...xs) * mm.tilewidth, y: y + Math.min(...ys) * mm.tileheight, w: (Math.max(...xs) - Math.min(...xs)) * mm.tilewidth, h: (Math.max(...ys) - Math.min(...ys)) * mm.tileheight };
+        if (xs.length) { const P = 2; /* 与画布 layerChunkBounds 的留边一致 */ return { x: x + (Math.min(...xs) - P) * mm.tilewidth, y: y + (Math.min(...ys) - P) * mm.tileheight, w: (Math.max(...xs) - Math.min(...xs) + 2 * P) * mm.tilewidth, h: (Math.max(...ys) - Math.min(...ys) + 2 * P) * mm.tileheight }; }
       }
       return { x, y, w: w || 320, h: h || 224 };
     }
@@ -98,11 +98,12 @@
       return { x: x0, y: y0, w: Math.max(...ex.map((r) => r.x + r.w)) - x0, h: Math.max(...ex.map((r) => r.y + r.h)) - y0 };
     }
     // 屏幕坐标 ↔ 世界坐标（以当前地图画布为基准）
-    function toWorld(cx, cy) { const e = curEntry(); const r = cvs.getBoundingClientRect(), s = state.zoom || 1; return { x: (e ? e.x || 0 : 0) + (cx - r.left) / s, y: (e ? e.y || 0 : 0) + (cy - r.top) / s }; }
+    function origin() { const e = curEntry(); if (!e) return { x: 0, y: 0 }; const x = extentOf(e); return { x: x.x, y: x.y }; } // 画布左上角对应的世界坐标（无限图按 chunk 范围）
+    function toWorld(cx, cy) { const o = origin(); const r = cvs.getBoundingClientRect(), s = state.zoom || 1; return { x: o.x + (cx - r.left) / s, y: o.y + (cy - r.top) / s }; }
     function centerOn(wx, wy) {
-      const e = curEntry(); if (!e) return;
+      const e = curEntry(); if (!e) return; const o = origin();
       const r = cvs.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), s = state.zoom || 1;
-      const sx = r.left + (wx - (e.x || 0)) * s, sy = r.top + (wy - (e.y || 0)) * s;
+      const sx = r.left + (wx - o.x) * s, sy = r.top + (wy - o.y) * s;
       wrap.scrollLeft += sx - (wr.left + wr.width / 2); wrap.scrollTop += sy - (wr.top + wr.height / 2);
     }
     const redraw = () => { api.draw(); if (F.paintWorldBackdrop) F.paintWorldBackdrop(); };
@@ -172,8 +173,8 @@
     wrap.addEventListener('mousemove', (ev) => {
       const h = hitNeighbor(ev);
       if (!h) { hl.hidden = true; wrap.classList.remove('world-hovering'); return; }
-      const e = curEntry(), r = cvs.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), s = state.zoom || 1;
-      const left = r.left - wr.left + wrap.scrollLeft + (h.r.x - (e.x || 0)) * s, top = r.top - wr.top + wrap.scrollTop + (h.r.y - (e.y || 0)) * s;
+      const o = origin(), r = cvs.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), s = state.zoom || 1;
+      const left = r.left - wr.left + wrap.scrollLeft + (h.r.x - o.x) * s, top = r.top - wr.top + wrap.scrollTop + (h.r.y - o.y) * s;
       Object.assign(hl.style, { left: left + 'px', top: top + 'px', width: h.r.w * s + 'px', height: h.r.h * s + 'px' });
       const dirty = state.worldSession.has(h.e._path) ? ' •未保存' : '';
       hl.dataset.label = baseOf(h.e.fileName) + dirty + ' · 双击切换编辑'; hl.dataset.file = baseOf(h.e.fileName);
@@ -215,7 +216,7 @@
       item.innerHTML = '<span class="tb-lbl"></span>'; item.onclick = () => setShow(ls.get(HIDE_KEY) === '1');
       const p = m.querySelector(':scope > .tb-menu-panel'); p.appendChild(item); syncItem();
     })(0);
-    api.worldAuto = { findWorlds, switchTo, frame, setShow, current: () => auto, curEntry, extentOf };
+    api.worldAuto = { origin, toWorld, findWorlds, switchTo, frame, setShow, current: () => auto, curEntry, extentOf };
   }
   const start = () => (window.TiledApp && window.TiledApp.folder ? setTimeout(() => boot(window.TiledApp), 60) : setTimeout(start, 50));
   start();
