@@ -1,7 +1,13 @@
-Third-party software
-====================
+Third-party and licensing notes
+===============================
+
+This project is licensed under the GNU Affero General Public License v3.0 (see LICENSE).
 
 pako (tool/pako.min.js)
   zlib/inflate helpers used for TMX/TMJ compression.
   Upstream: https://github.com/nodeca/pako
-  License: MIT (see upstream repository)
+  License: MIT AND Zlib (see upstream)
+
+This project is an independent browser reimplementation inspired by the Tiled
+Map Editor. It is not affiliated with mapeditor.org. Official Tiled source and
+assets are under their own licenses (largely GPL for the desktop app).

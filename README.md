@@ -72,6 +72,10 @@ cd tool && python3 test_smoke.py
 
 ## 许可证
 
-本仓库代码以 [MIT](LICENSE) 发布。`tool/pako.min.js` 为第三方库，请遵循其原许可证。
+本仓库代码以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。
 
-官方 Tiled 桌面版请从 [mapeditor.org](https://www.mapeditor.org/) 或 [GitHub Releases](https://github.com/mapeditor/tiled/releases) 获取。
+含义简述：你可以自由使用、修改；若你对外提供基于本项目的网络服务或再分发改版，一般需要按 AGPL 提供对应源代码。
+
+`tool/pako.min.js` 为第三方库，请遵循其原许可证（MIT/Zlib）。
+
+官方 Tiled 桌面版请从 [mapeditor.org](https://www.mapeditor.org/) 或 [GitHub Releases](https://github.com/mapeditor/tiled/releases) 获取。本项目与官方无关。
