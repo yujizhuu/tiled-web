@@ -1229,6 +1229,7 @@
       tilesetRegistry.length = 0; state.tileset = null;
       state.mapFileName = file.name;
       state.mapFile = file;
+      state.fileHandle = null;
       state.openFileBundle = Array.from(files || [file]);
       setMap(map);
       if (typeof window.__tiledBeforeAttachAssets === 'function') {
@@ -1356,8 +1357,9 @@
     a.download = name; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  function save() {
+  async function save() {
     if (!state.map) return;
+    if (typeof window.__tiledSaveToHandle === 'function' && await window.__tiledSaveToHandle()) return;
     download('tiled-map.tmj', 'application/json', JSON.stringify(state.map, null, 2));
     status('已导出 TMJ'); log('导出：tiled-map.tmj');
   }
