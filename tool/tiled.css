@@ -123,3 +123,42 @@ button[data-action="toggle-live-automap"].active{background:var(--accent2);borde
 .help-example{background:#111319;border-left:3px solid var(--accent);padding:6px 10px!important;margin-top:8px!important}
 .help-note{color:#e8c070!important;font-size:12px;margin-top:6px!important}
 .section-head>span:first-child{white-space:nowrap;display:inline-flex;align-items:center}.layers-section .section-actions button{padding:1px 5px}
+/* ===== 顶栏：菜单栏布局（0.9.1） ===== */
+.topbar[data-layout="menubar"]{flex-wrap:nowrap;overflow:hidden;gap:10px;min-height:44px;padding:4px 10px;position:relative;z-index:50}
+.topbar[data-layout="menubar"]{overflow:visible}
+.topbar[data-layout="menubar"] .toolbar{flex:1 1 0;min-width:0;flex-wrap:nowrap;overflow:visible;gap:8px;padding:0}
+.topbar[data-layout="menubar"] .brand{flex-shrink:0}
+.topbar[data-layout="menubar"] .status{flex:0 1 auto;min-width:0;max-width:200px}
+.topbar.tb-no-status .status{display:none}
+.topbar.tb-compact .brand>span:not(.brand-mark){display:none}
+.topbar.tb-compact .brand small{display:none}
+.tb-menubar{display:flex;flex-wrap:nowrap;gap:1px;flex-shrink:0}
+.tb-menubar>.tb-menu>.tb-menu-btn{background:transparent;border-color:transparent;padding:3px 9px;height:30px}
+.tb-menubar>.tb-menu>.tb-menu-btn:hover{background:#2a303c}
+.tb-chunk{display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:nowrap}
+.tb-primary{padding-left:8px;border-left:1px solid var(--line)}
+.tb-tools{padding-left:8px;border-left:1px solid var(--line)}
+.tb-tools .tool-mode,.tb-tools .tool-group{display:flex;gap:3px;flex-shrink:0}
+.tb-tools .tool-group[hidden]{display:none}
+.tb-icon{min-width:32px;padding:3px 6px!important;font-size:15px}
+.tb-more{margin-left:auto;flex-shrink:0}
+.tb-more[hidden]{display:none}
+.tb-menu-panel{max-height:min(75vh,520px);overflow:auto}
+.tb-menu-panel kbd{margin-left:auto;padding-left:16px;color:var(--muted);font:11px ui-monospace,Menlo,monospace}
+.tb-menu-panel>button,.tb-menu-panel>.tb-sub>.tb-menu-btn{display:flex;align-items:center;gap:6px;width:100%;white-space:nowrap}
+.tb-menu-panel{min-width:180px;max-width:min(300px,92vw)}
+.tb-sub{width:100%}
+.tb-sub>.tb-menu-btn{height:auto;min-height:28px;text-align:left;padding:5px 10px;font-size:12px;background:#272c36}
+.tb-sub>.tb-menu-panel{position:static;box-shadow:none;margin:2px 0 2px 10px;border-color:#2c3340}
+/* 「更多」里的分组以小标题展开 */
+.tb-more-panel{width:max-content;min-width:220px}
+.tb-more-panel>.tb-menu>.tb-menu-btn{display:none}
+.tb-more-panel>.tb-menu>.tb-menu-panel{display:flex!important;position:static;box-shadow:none;border:0;padding:0;max-height:none;overflow:visible;background:transparent}
+.tb-more-panel>.tb-menu::before,.tb-more-panel>.tb-chunk::before{content:attr(data-label);display:block;padding:6px 8px 2px;font-size:11px;color:var(--muted);font-weight:600}
+.tb-more-panel>.tb-chunk{flex-direction:column;align-items:stretch;border:0;padding:0 0 4px}
+.tb-more-panel>.tb-tools>div{flex-wrap:wrap;padding:0 6px}
+.tb-more-panel>.zoom{flex-direction:row;padding:0 8px 6px;margin:0}
+.tb-more-panel>.zoom::before{display:none}
+.tb-more-panel .tb-tools button{width:auto;min-width:32px;justify-content:center;text-align:center}
+.tb-more-panel .tb-tools .tool-mode{flex-direction:row}
+.tb-more-panel .tb-tools .tool-mode>button{flex:1}
