@@ -162,3 +162,13 @@ button[data-action="toggle-live-automap"].active{background:var(--accent2);borde
 .tb-more-panel .tb-tools button{width:auto;min-width:32px;justify-content:center;text-align:center}
 .tb-more-panel .tb-tools .tool-mode{flex-direction:row}
 .tb-more-panel .tb-tools .tool-mode>button{flex:1}
+/* ===== 侧栏标题自适应（0.9.2）：按钮可换行，不裁切不溢出 ===== */
+.workbench{grid-template-columns:clamp(190px,17vw,240px) minmax(0,1fr) clamp(200px,20vw,280px)}
+@media(max-width:700px){.workbench{grid-template-columns:170px minmax(0,1fr) 180px}}
+.left-panel,.right-panel{overflow-x:hidden}
+.section-head{height:auto;min-height:36px;flex-wrap:wrap;gap:4px 6px;padding:5px 8px;row-gap:4px}
+.section-head>span:first-child{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:4px}
+.section-actions{flex-wrap:wrap;justify-content:flex-end;margin-left:auto;min-width:0;max-width:100%;gap:3px}
+.section-actions button,.section-head>button{min-width:24px;padding:1px 5px;flex-shrink:0}
+.props-head{flex-wrap:wrap;gap:4px}
+.layer-opacity label{white-space:nowrap;min-width:0}.layer-opacity input{min-width:0}

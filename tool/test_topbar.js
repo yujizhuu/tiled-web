@@ -49,6 +49,29 @@ const check = (ok, msg) => { console.log((ok ? 'ok   ' : 'FAIL ') + msg); if (!o
       return bad;
     });
     check(reach.length === 0, `${w}px 所有顶栏动作可达` + (reach.length ? ' ' + reach : ''));
+    const ph = await page.evaluate(() => {
+      const bad = [];
+      document.querySelectorAll('.left-panel, .right-panel').forEach((panel) => {
+        if (panel.scrollWidth > panel.clientWidth + 0.5) bad.push('面板横向溢出 ' + panel.className);
+        const pr = panel.getBoundingClientRect();
+        panel.querySelectorAll('.section-head, .props-head').forEach((h) => {
+          if (!h.offsetParent) return;
+          const hr = h.getBoundingClientRect();
+          const items = [...h.querySelectorAll(':scope > span:first-child, :scope button')].filter((e) => e.offsetWidth > 0);
+          const bx = items.map((e) => ({ e, r: e.getBoundingClientRect() }));
+          bx.forEach(({ e, r }) => {
+            if (r.left < Math.max(hr.left, pr.left) - 0.5 || r.right > Math.min(hr.right, pr.left + panel.clientWidth) + 0.5 || r.top < hr.top - 0.5 || r.bottom > hr.bottom + 0.5) bad.push('裁切 ' + (h.textContent || '').trim().slice(0, 6) + ':' + (e.title || e.textContent).slice(0, 8));
+          });
+          for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) {
+            const a = bx[i], c = bx[j]; if (a.e.contains(c.e) || c.e.contains(a.e)) continue;
+            if (a.r.left < c.r.right - 0.5 && c.r.left < a.r.right - 0.5 && a.r.top < c.r.bottom - 0.5 && c.r.top < a.r.bottom - 0.5) bad.push('重叠 ' + (a.e.title || a.e.textContent).slice(0, 6) + '×' + (c.e.title || c.e.textContent).slice(0, 6));
+          }
+        });
+      });
+      return bad;
+    });
+    check(ph.length === 0, `${w}px 侧栏标题按钮完整可见、互不重叠、面板不横向溢出` + (ph.length ? ' ' + ph.join('; ') : ''));
+    if (process.env.SHOTS && (w === 800 || w === 1440)) await page.screenshot({ path: `/workspace/panel-${w}.png`, captureBeyondViewport: false });
     if (process.env.SHOTS && (w === 1440 || w === 1024)) await page.screenshot({ path: `/workspace/topbar-${w}.png`, clip: { x: 0, y: 0, width: w, height: 420 } });
     if (w === 800) {
       // 打开「文件」菜单与「更多」菜单，菜单面板也不能超出视口
