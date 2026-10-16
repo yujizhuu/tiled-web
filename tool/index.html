@@ -13,9 +13,14 @@
       <button data-action="new" title="新建地图">新建</button>
       <button data-action="open" title="打开 TMJ、TMX 或 TSJ">打开</button>
       <button data-action="save" title="导出 TMJ">保存</button>
-      <button data-action="save-tmx" title="导出 TMX">TMX</button>
-      <button data-action="save-csv" title="导出当前瓦片层 CSV">CSV</button>
-      <button data-action="export-png" title="导出 PNG">PNG</button>
+      <div class="tb-menu">
+        <button type="button" class="tb-menu-btn" aria-expanded="false" aria-haspopup="true" title="导出其他格式">导出 ▾</button>
+        <div class="tb-menu-panel" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="save-tmx" title="导出 TMX">TMX</button>
+          <button type="button" role="menuitem" data-action="save-csv" title="导出当前瓦片层 CSV">CSV</button>
+          <button type="button" role="menuitem" data-action="export-png" title="导出 PNG">PNG</button>
+        </div>
+      </div>
       <span class="sep"></span>
       <button data-action="undo" title="撤销">↶</button>
       <button data-action="redo" title="重做">↷</button>
@@ -33,27 +38,49 @@
       <button data-tool="polygon" class="tool" title="多边形对象">⬠</button>
       <button data-tool="tile-object" class="tool" title="图块对象">▣</button>
       <span class="sep"></span>
-      <button data-action="automap" title="应用自动地图规则">自动地图</button>
-      <button data-action="toggle-live-automap" title="绘制时实时自动地图">实时自动地图</button>
-      <button data-tool="terrain" class="tool" title="地形笔刷">地形</button>
-      <button data-tool="wang" class="tool" title="Wang 笔刷">Wang</button>
-      <button data-action="wang-fill" title="WangFiller 区域填充">Wang填充</button>
-      <button data-action="terrain-mark" title="在图块集上标记地形角">标角</button>
-      <button data-action="automap-browser" title="规则浏览/预览">规则浏览</button>
-      <button data-action="rule-edit" title="编辑/新建自动地图规则">规则编辑</button>
-      <button data-action="bind-assets" title="绑定地图资源目录">资源目录</button>
-      <button data-action="load-world" title="打开 .world">World</button>
-      <button data-action="object-types" title="对象类型">对象类型</button>
-      <button data-action="property-types" title="属性类型 propertytypes">属性类型</button>
-      <button data-action="chunk-panel" title="无限地图 chunk">Chunks</button>
-      <button data-action="world-view-toggle" title="World 并排预览">World视图</button>
-      <button data-action="preferences" title="首选项">首选项</button>
-      <button data-action="templates" title="对象模板">模板</button>
-      <button data-action="world-editor" title="World 共享相机编辑">World编辑</button>
-      <button data-action="cli-help" title="浏览器 CLI 帮助">CLI</button>
-      <button data-action="edit-collision" title="编辑当前图块碰撞">碰撞编辑</button>
-      <button data-action="grid" title="显示网格">网格</button>
-      <button data-action="collision" title="显示图块碰撞">碰撞</button>
+      <div class="tb-menu">
+        <button type="button" class="tb-menu-btn" aria-expanded="false" aria-haspopup="true" title="自动地图与地形">自动地图 ▾</button>
+        <div class="tb-menu-panel" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="automap" title="应用自动地图规则">自动地图</button>
+          <button type="button" role="menuitem" data-action="toggle-live-automap" title="绘制时实时自动地图">实时自动地图</button>
+          <button type="button" role="menuitem" data-action="automap-browser" title="规则浏览/预览">规则浏览</button>
+          <button type="button" role="menuitem" data-action="rule-edit" title="编辑/新建自动地图规则">规则编辑</button>
+          <hr class="tb-menu-sep">
+          <button type="button" role="menuitem" data-tool="terrain" class="tool" title="地形笔刷">地形</button>
+          <button type="button" role="menuitem" data-tool="wang" class="tool" title="Wang 笔刷">Wang</button>
+          <button type="button" role="menuitem" data-action="wang-fill" title="WangFiller 区域填充">Wang填充</button>
+          <button type="button" role="menuitem" data-action="terrain-mark" title="在图块集上标记地形角">标角</button>
+        </div>
+      </div>
+      <div class="tb-menu">
+        <button type="button" class="tb-menu-btn" aria-expanded="false" aria-haspopup="true" title="World 与资源">World ▾</button>
+        <div class="tb-menu-panel" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="load-world" title="打开 .world">打开 World</button>
+          <button type="button" role="menuitem" data-action="world-view-toggle" title="World 并排预览">World视图</button>
+          <button type="button" role="menuitem" data-action="world-editor" title="World 共享相机编辑">World编辑</button>
+          <button type="button" role="menuitem" data-action="bind-assets" title="绑定地图资源目录">资源目录</button>
+        </div>
+      </div>
+      <div class="tb-menu">
+        <button type="button" class="tb-menu-btn" aria-expanded="false" aria-haspopup="true" title="类型与模板">类型 ▾</button>
+        <div class="tb-menu-panel" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="object-types" title="对象类型">对象类型</button>
+          <button type="button" role="menuitem" data-action="property-types" title="属性类型 propertytypes">属性类型</button>
+          <button type="button" role="menuitem" data-action="templates" title="对象模板">模板</button>
+        </div>
+      </div>
+      <div class="tb-menu">
+        <button type="button" class="tb-menu-btn" aria-expanded="false" aria-haspopup="true" title="视图与设置">视图 ▾</button>
+        <div class="tb-menu-panel" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="grid" title="显示网格">网格</button>
+          <button type="button" role="menuitem" data-action="collision" title="显示图块碰撞">碰撞</button>
+          <button type="button" role="menuitem" data-action="edit-collision" title="编辑当前图块碰撞">碰撞编辑</button>
+          <button type="button" role="menuitem" data-action="chunk-panel" title="无限地图 chunk">Chunks</button>
+          <hr class="tb-menu-sep">
+          <button type="button" role="menuitem" data-action="preferences" title="首选项">首选项</button>
+          <button type="button" role="menuitem" data-action="cli-help" title="浏览器 CLI 帮助">CLI</button>
+        </div>
+      </div>
       <label class="zoom">缩放 <input id="zoom" type="range" min="25" max="400" value="100"><output id="zoomValue">100%</output></label>
     </div>
     <div id="status" class="status">就绪</div>

@@ -1450,6 +1450,47 @@
     status('已导出 CSV'); log('导出当前瓦片层 CSV');
   }
 
+  function closeToolbarMenus(except) {
+    document.querySelectorAll('.tb-menu.open').forEach((menu) => {
+      if (except && menu === except) return;
+      menu.classList.remove('open');
+      const btn = menu.querySelector('.tb-menu-btn');
+      const panel = menu.querySelector('.tb-menu-panel');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      if (panel) panel.hidden = true;
+    });
+  }
+
+  function bindToolbarMenus() {
+    document.querySelectorAll('.tb-menu').forEach((menu) => {
+      const btn = menu.querySelector('.tb-menu-btn');
+      const panel = menu.querySelector('.tb-menu-panel');
+      if (!btn || !panel) return;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const willOpen = !menu.classList.contains('open');
+        closeToolbarMenus();
+        if (willOpen) {
+          menu.classList.add('open');
+          btn.setAttribute('aria-expanded', 'true');
+          panel.hidden = false;
+          // Flip panel if it would overflow the right edge
+          panel.classList.remove('tb-menu-panel-end');
+          const rect = panel.getBoundingClientRect();
+          if (rect.right > window.innerWidth - 8) panel.classList.add('tb-menu-panel-end');
+        }
+      });
+      panel.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action],[data-tool]')) closeToolbarMenus();
+      });
+    });
+    document.addEventListener('click', () => closeToolbarMenus());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeToolbarMenus();
+    });
+  }
+
   function bind() {
     document.querySelectorAll('[data-action]').forEach((b) => b.onclick = () => {
       const a = b.dataset.action;
@@ -1475,8 +1516,13 @@
     document.querySelectorAll('[data-tool]').forEach((b) => b.onclick = () => {
       state.tool = b.dataset.tool;
       document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('.tb-menu').forEach((menu) => {
+        const hasActive = !!menu.querySelector('[data-tool].active');
+        menu.classList.toggle('has-active-tool', hasActive);
+      });
       status(`工具：${b.title}`);
     });
+    bindToolbarMenus();
     els.mapInput.onchange = () => els.mapInput.files[0] && openFile(els.mapInput.files[0], els.mapInput.files);
     els.tilesetInput.onchange = () => loadTiles(els.tilesetInput.files).catch((err) => { status('载入失败'); log(err.message); });
     $('#layerOpacity').oninput = (e) => {
