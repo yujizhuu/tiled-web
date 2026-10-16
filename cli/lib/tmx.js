@@ -72,8 +72,11 @@ function parseElementBlocks(inner, tagNames) {
   while ((m = re.exec(inner))) {
     const tag = m[1].toLowerCase();
     if (!tags.has(tag)) continue;
-    const selfClosing = m[3] === '/>';
-    const attrs = parseAttrs(m[2] || '');
+    // [^>]* can swallow the "/" in "/>", so detect self-close from the full match
+    const selfClosing = m[0].endsWith('/>') || m[3] === '/>';
+    let attrText = m[2] || '';
+    if (selfClosing) attrText = attrText.replace(/\/\s*$/, '');
+    const attrs = parseAttrs(attrText);
     if (selfClosing) {
       results.push({ tag, attrs, content: '', fullStart: m.index, fullEnd: re.lastIndex });
       continue;

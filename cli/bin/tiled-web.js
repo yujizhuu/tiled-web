@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 2 (create / info / export / layer / tile write / tileset)
+ * tiled-web CLI — Phase 3 (objects / properties / richer tilesets + Phase 1–2)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -24,11 +24,21 @@ const {
   formatLayerCsv,
 } = require('../lib/layers');
 const { addTileset, listTilesets } = require('../lib/tilesets');
+const {
+  listObjects,
+  addObject,
+  removeObject,
+  updateObject,
+  summarizeObject,
+  addObjectLayer,
+} = require('../lib/objects');
+const { listProps, getProp, setProp, removeProp, resolveOwner } = require('../lib/props');
+const { applyFlipFlags, decodeGid } = require('../lib/gid');
 
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 2 CLI (layers / tiles / tilesets)
+  const text = `tiled-web ${PKG.version} — Phase 3 CLI (objects / properties / tilesets)
 
 Usage:
   tiled-web version
@@ -36,22 +46,38 @@ Usage:
   tiled-web info <map.tmj|map.tmx> [--format json|text]
   tiled-web export <map.tmj|map.tmx> -f tmj|tmx|csv -o <out>
 
-  tiled-web set-tile <map> --x X --y Y --gid GID [--layer name|index] [-o out]
-  tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer name|index] [-o out]
+  tiled-web set-tile <map> --x X --y Y --gid GID [--layer name|index]
+                      [--flip-h] [--flip-v] [--flip-d] [-o out]
+  tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer name|index]
+                 [--flip-h] [--flip-v] [--flip-d] [-o out]
   tiled-web get-layer <map> [--layer name|index] [--format json|csv] [-o out]
 
   tiled-web layer list <map>
-  tiled-web layer add <map> [--name NAME] [-o out]
+  tiled-web layer add <map> [--name NAME] [--type tile|object] [-o out]
   tiled-web layer remove <map> --layer name|index [-o out]
   tiled-web layer rename <map> --layer name|index --name NEW [-o out]
 
   tiled-web tileset add <map> --firstgid N [--name NAME] [--image PATH] [--source PATH.tsx]
-                              [--tilewidth TW] [--tileheight TH] [--columns C] [--tilecount N] [-o out]
+                              [--tilewidth TW] [--tileheight TH] [--columns C] [--tilecount N]
+                              [--imagewidth W] [--imageheight H] [--embed] [-o out]
   tiled-web tileset list <map>
+
+  tiled-web object list <map> [--layer name|index]
+  tiled-web object add <map> --layer <objectlayer> --x X --y Y [--name NAME] [--type|--class T]
+                             [--width W] [--height H] [--shape rectangle|ellipse|point|polygon]
+                             [--points "x,y ..."] [--id N] [--create-layer] [-o out]
+  tiled-web object remove <map> --layer <objectlayer> --id N|--name NAME [-o out]
+  tiled-web object update <map> --layer <objectlayer> --id N [--x --y --width --height --name|--new-name --type|--class --shape ...] [-o out]
+
+  tiled-web prop list <map> --target map|layer|object|tileset [--layer ...] [--id ...] [--tileset ...]
+  tiled-web prop get  <map> --target ... --name KEY
+  tiled-web prop set  <map> --target ... --name KEY --value VAL [--type string|int|float|bool] [-o out]
+  tiled-web prop remove <map> --target ... --name KEY [-o out]
 
 Notes:
   - Mutations write in-place unless -o / --output is set.
-  - Default --layer is the first tile layer.
+  - Default --layer for tile cmds is the first tile layer.
+  - Object identity for prop --target object: --layer + --id (or --object-name).
   - TMX support is minimal orthogonal (CSV data).
   - Browser UI under tool/ is unchanged.
 
@@ -93,7 +119,6 @@ function parseArgs(argv) {
   }
   if (flags.o && !flags.output) flags.output = flags.o;
   if (flags.f && !flags.format) flags.format = flags.f;
-  // aliases for fill size
   if (flags.w != null && flags.width == null) flags.width = flags.w;
   if (flags.h != null && flags.height == null) flags.height = flags.h;
   return { cmd, flags, positional };
@@ -105,7 +130,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 2 (layers/tiles/tilesets + create/info/export)\n`);
+  process.stdout.write(`phase: 3 (objects/properties/tilesets + layers/tiles + create/info/export)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -160,7 +185,8 @@ function cmdSetTile(positional, flags) {
   if (!file) die('set-tile requires a map path');
   const x = parseIntFlag(flags.x, 'x', { min: 0, allowZero: true });
   const y = parseIntFlag(flags.y, 'y', { min: 0, allowZero: true });
-  const gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
+  let gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
+  gid = applyFlipFlags(gid, flags);
   const map = loadMap(file);
   const layer = resolveLayer(map, flags.layer, { tileOnly: true, required: true });
   const written = setTileAt(layer, x, y, gid, map);
@@ -171,6 +197,7 @@ function cmdSetTile(positional, flags) {
     x,
     y,
     gid: written,
+    decoded: decodeGid(written),
     ...saved,
   });
 }
@@ -182,7 +209,8 @@ function cmdFill(positional, flags) {
   const y = parseIntFlag(flags.y, 'y', { min: 0, allowZero: true });
   const width = parseIntFlag(flags.width, 'width', { min: 1 });
   const height = parseIntFlag(flags.height, 'height', { min: 1 });
-  const gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
+  let gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
+  gid = applyFlipFlags(gid, flags);
   const map = loadMap(file);
   const layer = resolveLayer(map, flags.layer, { tileOnly: true, required: true });
   const result = fillRect(map, layer, { x, y, width, height, gid });
@@ -191,6 +219,7 @@ function cmdFill(positional, flags) {
     action: 'fill',
     layer: { id: layer.id, name: layer.name },
     ...result,
+    decoded: decodeGid(gid),
     ...saved,
   });
 }
@@ -253,25 +282,33 @@ function cmdLayer(positional, flags) {
   if (sub === 'list') {
     const map = loadMap(file);
     process.stdout.write(
-      JSON.stringify(
-        {
-          file: path.resolve(file),
-          layers: listLayers(map),
-        },
-        null,
-        2
-      ) + '\n'
+      JSON.stringify({ file: path.resolve(file), layers: listLayers(map) }, null, 2) + '\n'
     );
     return;
   }
 
   const map = loadMap(file);
   if (sub === 'add') {
-    const layer = addTileLayer(map, { name: flags.name });
+    const type = String(flags.type || 'tile').toLowerCase();
+    let layer;
+    if (type === 'object' || type === 'objectgroup' || type === 'objectlayer') {
+      layer = addObjectLayer(map, { name: flags.name });
+    } else if (type === 'tile' || type === 'tilelayer') {
+      layer = addTileLayer(map, { name: flags.name });
+    } else {
+      die(`Unknown layer --type: ${flags.type} (use tile|object)`);
+    }
     const saved = saveMap(map, { output: flags.output, inPlacePath: file });
     ok({
       action: 'layer-add',
-      layer: { id: layer.id, name: layer.name, type: layer.type, width: layer.width, height: layer.height },
+      layer: {
+        id: layer.id,
+        name: layer.name,
+        type: layer.type,
+        width: layer.width,
+        height: layer.height,
+        objectCount: layer.objects ? layer.objects.length : undefined,
+      },
       ...saved,
     });
     return;
@@ -315,7 +352,9 @@ function cmdTileset(positional, flags) {
   }
   if (sub === 'add') {
     const map = loadMap(file);
-    const ts = addTileset(map, flags);
+    const ts = addTileset(map, flags, { mapPath: file });
+    const notes = ts._notes || [];
+    delete ts._notes;
     const saved = saveMap(map, { output: flags.output, inPlacePath: file });
     ok({
       action: 'tileset-add',
@@ -326,12 +365,137 @@ function cmdTileset(positional, flags) {
         image: ts.image || null,
         tilewidth: ts.tilewidth,
         tileheight: ts.tileheight,
+        tilecount: ts.tilecount != null ? ts.tilecount : null,
+        columns: ts.columns != null ? ts.columns : null,
+        imagewidth: ts.imagewidth != null ? ts.imagewidth : null,
+        imageheight: ts.imageheight != null ? ts.imageheight : null,
       },
+      notes,
       ...saved,
     });
     return;
   }
   die(`Unknown tileset subcommand: ${sub} (use add|list)`);
+}
+
+function cmdObject(positional, flags) {
+  const sub = positional[0];
+  const file = positional[1];
+  if (!sub) die('object requires subcommand: list|add|remove|update');
+  if (!file) die(`object ${sub} requires a map path`);
+
+  if (sub === 'list') {
+    const map = loadMap(file);
+    const objects = listObjects(map, flags.layer);
+    process.stdout.write(
+      JSON.stringify({ file: path.resolve(file), count: objects.length, objects }, null, 2) + '\n'
+    );
+    return;
+  }
+
+  const map = loadMap(file);
+  if (sub === 'add') {
+    const { layer, object } = addObject(map, flags);
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'object-add',
+      layer: { id: layer.id, name: layer.name },
+      object: summarizeObject(object),
+      ...saved,
+    });
+    return;
+  }
+  if (sub === 'remove') {
+    const { layer, object } = removeObject(map, flags);
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'object-remove',
+      layer: { id: layer.id, name: layer.name },
+      removed: summarizeObject(object),
+      ...saved,
+    });
+    return;
+  }
+  if (sub === 'update') {
+    // For update, --name alone is identity; use --new-name to rename
+    const { layer, object } = updateObject(map, flags);
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'object-update',
+      layer: { id: layer.id, name: layer.name },
+      object: summarizeObject(object),
+      ...saved,
+    });
+    return;
+  }
+  die(`Unknown object subcommand: ${sub} (use list|add|remove|update)`);
+}
+
+function cmdProp(positional, flags) {
+  const sub = positional[0];
+  const file = positional[1];
+  if (!sub) die('prop requires subcommand: list|get|set|remove');
+  if (!file) die(`prop ${sub} requires a map path`);
+
+  const map = loadMap(file);
+  // Normalize object identity flags for resolveOwner
+  if (flags['object-name'] == null && flags.objectname == null) {
+    // when --target object and --id is set, --name is the property key
+    // when --target object and no --id, --object-name identifies; --name is prop key
+  }
+  const { owner, label } = resolveOwner(map, flags);
+
+  if (sub === 'list') {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          file: path.resolve(file),
+          target: flags.target || 'map',
+          label,
+          properties: listProps(owner),
+        },
+        null,
+        2
+      ) + '\n'
+    );
+    return;
+  }
+  if (sub === 'get') {
+    const rec = getProp(owner, flags.name);
+    process.stdout.write(
+      JSON.stringify({ file: path.resolve(file), target: flags.target || 'map', label, ...rec }, null, 2) +
+        '\n'
+    );
+    return;
+  }
+  if (sub === 'set') {
+    if (flags.value === undefined) die('prop set requires --value <value>');
+    // boolean flags: --value true without next token becomes flags.value === true
+    const value = flags.value === true ? 'true' : flags.value;
+    const rec = setProp(owner, flags.name, value, flags.type);
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'prop-set',
+      target: flags.target || 'map',
+      label,
+      ...rec,
+      ...saved,
+    });
+    return;
+  }
+  if (sub === 'remove') {
+    const rec = removeProp(owner, flags.name);
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'prop-remove',
+      target: flags.target || 'map',
+      label,
+      ...rec,
+      ...saved,
+    });
+    return;
+  }
+  die(`Unknown prop subcommand: ${sub} (use list|get|set|remove)`);
 }
 
 function main() {
@@ -368,6 +532,15 @@ function main() {
         break;
       case 'tileset':
         cmdTileset(positional, flags);
+        break;
+      case 'object':
+      case 'objects':
+        cmdObject(positional, flags);
+        break;
+      case 'prop':
+      case 'property':
+      case 'props':
+        cmdProp(positional, flags);
         break;
       case 'help':
         usage(0);

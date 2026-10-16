@@ -20,9 +20,9 @@ cd tiled-web
 
 macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
-## CLI（Phase 2 · Agent 用）
+## CLI（Phase 3 · Agent 用）
 
-无界面时可用命令行创建 / 查看 / 写瓦片 / 管图层与图块集 / 导出地图。需要 **Node.js 18+**。零 npm 依赖。当前覆盖建图、图层与瓦片写入、图块集引用与格式转换（仍非完整编辑器对等）。
+无界面时可用命令行创建 / 查看 / 写瓦片 / 管图层与对象 / 自定义属性 / 图块集 / 导出地图。需要 **Node.js 18+**。零 npm 依赖。当前覆盖建图、图层与瓦片写入、对象层、属性、图块集引用与格式转换（仍非完整编辑器对等）。
 
 ### 安装
 
@@ -40,19 +40,24 @@ tiled-web version
 
 | 命令 | 作用 |
 |------|------|
-| `tiled-web version` | 版本与阶段（0.2.0 / Phase 2） |
+| `tiled-web version` | 版本与阶段（0.3.0 / Phase 3） |
 | `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] -o map.tmj` | 新建正交空瓦片层地图 |
 | `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
 | `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID |
-| `tiled-web set-tile <map> --x X --y Y --gid GID [--layer name\|index] [-o out]` | 写单个瓦片 GID（默认第一瓦片层；无 `-o` 则原地写） |
-| `tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer name\|index] [-o out]` | 矩形填充 GID |
+| `tiled-web set-tile <map> --x X --y Y --gid GID [--layer name\|index] [--flip-h] [--flip-v] [--flip-d] [-o out]` | 写单个瓦片 GID（可带翻转标志） |
+| `tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer ...] [--flip-h\|v\|d] [-o out]` | 矩形填充 GID |
 | `tiled-web get-layer <map> [--layer name\|index] [--format json\|csv] [-o out]` | 读出单层全部 GID |
 | `tiled-web layer list <map>` | 列出图层 |
-| `tiled-web layer add <map> [--name NAME] [-o out]` | 追加空瓦片层 |
+| `tiled-web layer add <map> [--name NAME] [--type tile\|object] [-o out]` | 追加瓦片层或对象层 |
 | `tiled-web layer remove <map> --layer name\|index [-o out]` | 删除图层 |
 | `tiled-web layer rename <map> --layer name\|index --name NEW [-o out]` | 重命名图层 |
-| `tiled-web tileset add <map> --firstgid N [--name NAME] [--image PATH] [--source PATH.tsx] [--tilewidth TW] [--tileheight TH] [--columns C] [--tilecount N] [-o out]` | 添加图块集引用 |
+| `tiled-web tileset add <map> --firstgid N [--name] [--image] [--source PATH.tsx] [--embed] [--tilewidth] [--tileheight] [--columns] [--tilecount] [--imagewidth] [--imageheight] [-o out]` | 添加图块集（可加载外部 `.tsx`；PNG 可读时推导 tilecount） |
 | `tiled-web tileset list <map>` | 列出图块集 |
+| `tiled-web object list <map> [--layer]` | 列出对象（JSON） |
+| `tiled-web object add <map> --layer <objectlayer> --x --y [--name] [--type\|--class] [--width] [--height] [--shape rectangle\|ellipse\|point\|polygon] [--points] [--id] [--create-layer] [-o out]` | 添加对象；`--create-layer` 时自动建对象层 |
+| `tiled-web object remove <map> --layer --id\|--name [-o out]` | 删除对象 |
+| `tiled-web object update <map> --layer --id ... [-o out]` | 更新位置 / 尺寸 / 名称 / 类型 / 形状 |
+| `tiled-web prop list\|get\|set\|remove <map> --target map\|layer\|object\|tileset ...` | 自定义属性；object 用 `--layer` + `--id`（或 `--object-name`），属性键为 `--name` |
 
 错误写 stderr，成功数据写 stdout；失败非零退出码。写操作默认原地保存，可用 `-o` 另存。
 
@@ -64,7 +69,11 @@ node bin/tiled-web.js new --width 32 --height 24 --tilewidth 16 --tileheight 16 
 node bin/tiled-web.js tileset add /tmp/level.tmj --name terrain --firstgid 1 --tilewidth 16 --tileheight 16 --image terrain.png --columns 8 --tilecount 64
 node bin/tiled-web.js layer add /tmp/level.tmj --name Ground
 node bin/tiled-web.js fill /tmp/level.tmj --layer Ground --x 0 --y 0 --width 32 --height 24 --gid 1
-node bin/tiled-web.js set-tile /tmp/level.tmj --layer Ground --x 4 --y 5 --gid 3
+node bin/tiled-web.js set-tile /tmp/level.tmj --layer Ground --x 4 --y 5 --gid 3 --flip-h
+node bin/tiled-web.js object add /tmp/level.tmj --layer Objects --create-layer --name Spawn --type Player --x 64 --y 48 --width 16 --height 16
+node bin/tiled-web.js prop set /tmp/level.tmj --target object --layer Objects --id 1 --name hp --value 100 --type int
+node bin/tiled-web.js prop set /tmp/level.tmj --target map --name author --value agent
+node bin/tiled-web.js object list /tmp/level.tmj
 node bin/tiled-web.js get-layer /tmp/level.tmj --layer Ground --format csv -o /tmp/ground.csv
 node bin/tiled-web.js info /tmp/level.tmj
 node bin/tiled-web.js export /tmp/level.tmj -f tmx -o /tmp/level.tmx
@@ -79,9 +88,9 @@ cd cli && ./test_smoke.sh
 ### CLI 路线图
 
 - **Phase 1：** `new` / `info` / `export`（TMJ · 最小 TMX · CSV）✅
-- **Phase 2（当前）：** 图层与瓦片写入（`set-tile`、`fill`、`get-layer`、`layer *`、`tileset add|list`）✅
-- **Phase 3：** 对象层、属性、更完整的图块集引用
-- **Phase 4：** 自动地图 / 地形批处理；可选 MCP 包装
+- **Phase 2：** 图层与瓦片写入（`set-tile`、`fill`、`get-layer`、`layer *`、`tileset add|list`）✅
+- **Phase 3（当前）：** 对象层、属性、更完整的图块集引用（`.tsx` / PNG 尺寸 / GID 翻转）✅
+- **Phase 4：** 自动地图 / 地形批处理；可选 MCP 包装；world
 
 ## 功能概览（相对 Tiled 1.2.4 · 网页）
 
@@ -117,7 +126,7 @@ tiled-web/
 ├── LICENSE           # AGPL-3.0
 ├── NOTICE
 ├── README.md
-├── cli/              # Node CLI（Phase 2）
+├── cli/              # Node CLI（Phase 3）
 │   ├── bin/tiled-web.js
 │   ├── lib/
 │   ├── package.json
