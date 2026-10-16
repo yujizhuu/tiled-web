@@ -17,7 +17,7 @@ t version
 echo "== 1. 新建地图 + 外部图块集(.tsx) =="
 q new --width 20 --height 14 --tilewidth 16 --tileheight 16 -o $M
 q tileset add $M --firstgid 1 --source village.tsx          # 外部 .tsx 引用（含 terraintypes / wangsets）
-q tileset add $M --firstgid 33 --name items --image tiles.png --tilewidth 16 --tileheight 16   # 内嵌图块集（自动读 PNG 尺寸）
+q tileset add $M --firstgid 33 --name items --image items.png --tilewidth 16 --tileheight 16   # 内嵌图块集（自动读 PNG 尺寸）
 t tileset list $M
 
 echo "== 2. 图层管理 =="
@@ -55,6 +55,9 @@ q set-tile $M --layer Deco --x 10 --y 8 --gid 28
 q set-tile $M --layer Deco --x 10 --y 5 --gid 27
 q set-tile $M --layer Deco --x 6 --y 6 --gid 32
 q fill $M --layer Deco --x 1 --y 11 --width 3 --height 1 --gid 25
+# 道具图块集 items（firstgid 33，items.png）：金币/宝石/药水/钥匙/剑/盾/爱心/食物/星星
+for xyg in "5 8 33" "6 8 34" "18 1 35" "19 6 36" "1 6 37" "14 2 39" "15 2 40" "3 3 46" "15 3 44" "13 3 45" "2 9 42" "12 6 48" "19 13 55" "7 13 50"; do
+  set -- $xyg; q set-tile $M --layer Deco --x $1 --y $2 --gid $3; done
 q get-layer $M --layer Ground --format csv -o $O/ground.csv
 t get-layer $M --layer Deco --format json | head -c 300; echo
 

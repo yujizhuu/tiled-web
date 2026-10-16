@@ -16,12 +16,12 @@ bash validate.sh         # （可选）需要 apt 安装 tiled xvfb：用官方 
 
 | 文件 | 说明 |
 |---|---|
-| `tiles.png` / `gen_tileset.py` | 图块集图片（原创程序化像素画，随仓库同许可；本地 id 布局见 gen_tileset.py 文件头，gid = id+1） |
+| `tiles.png` / `items.png` / `gen_tileset.py` | items.png = 内嵌道具图块集 items（firstgid 33，24 个：金币、多色宝石、药水、钥匙、剑、盾、爱心、卷轴、食物、炸弹、宝箱、星星等）；图块集图片（原创程序化像素画，随仓库同许可；本地 id 布局见 gen_tileset.py 文件头，gid = id+1） |
 | `village.tsx` | 外部图块集：含 `terraintypes`（草/土/水）与 `wangsets`（角色 Grass/Dirt、边色 Road） |
 | `templates/chest.tx` | XML 模板：图块对象（宝箱，带 tileset 引用和属性） |
 | `templates/sign.tj` | JSON 模板：矩形对象（路牌） |
 | `rules/rules.txt` + `rules/shadow.tmj` | 自动地图规则：墙下方是空的 → 在 Shadow 层画阴影（rule map 也是用 CLI 搭出来的） |
-| `build.sh` | 构建脚本（142 次 CLI 调用） |
+| `build.sh` | 构建脚本（156 次 CLI 调用） |
 | `mcp_demo.py` | MCP stdio 客户端示例（按 MCP 规范逐行 JSON-RPC） |
 | `render.py` | 极简 TMJ→PNG 渲染器（支持外部 .tsx、H/V/D 翻转位、无限 chunks、对象） |
 | `validate.sh` | 上游 Tiled 真值校验 |
@@ -35,7 +35,7 @@ bash validate.sh         # （可选）需要 apt 安装 tiled xvfb：用官方 
 | 步骤 | 做了什么 | 用到的命令 / 参数 |
 |---|---|---|
 | 0 | 看版本 | `version` |
-| 1 | 建 20×14 地图，挂外部 `.tsx` + 一个内嵌 PNG 图块集 | `new`、`tileset add --source`、`tileset add --image`、`tileset list` |
+| 1 | 建 20×14 地图，挂外部 `.tsx` + 内嵌道具图块集 items.png | `new`、`tileset add --source`、`tileset add --image`、`tileset list` |
 | 2 | 图层：Ground/Walls/Shadow/Deco/Objects，加一个临时层再删掉 | `layer rename/add/remove/list`、`--type tile|object` |
 | 3 | 铺草地、道路、池塘、房屋外墙、地板、门；4 棵树分别 原样/水平/垂直/旋转90° | `fill`、`set-tile --flip-h/--flip-v/--flip-d`、`get-layer --format csv|json` |
 | 4 | 把房屋 A 复制成房屋 B（墙 + 地板） | `stamp copy`、`stamp paste` |

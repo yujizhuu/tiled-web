@@ -181,3 +181,51 @@ shape(tile(31),["................","................","....oooooooo....","...obb
  "..obhbbbbbbbbo..","..ossssssssssso.","..obhbbbbbbbbo..","..obhbbbbbbbbo..","...ossssssssso..","...obbbbbbbbo...",
  "....oooooooo....","................","................","................"],{'o':'o','b':'b0','h':'b2','s':'s1'})
 img.save('tiles.png')
+
+# ---------- items.png: separate pickup/item tileset (8x3, 16px), same palette ----------
+img=Image.new('RGBA',(T*C,T*3),(0,0,0,0)); px=img.load()
+def gem(c,h): return (["................","................","................","......oooo......",".....occcco.....","....ochcccco....",
+ "...occcccccco...","....occcccco.....",".....occcco.....","......occo......",".......oo.......","................"],{'o':'o','c':c,'h':h})
+def potion(c): return (["................","................","......oooo......",".......bb.......","......oxxo......",".....occcco.....",
+ "....ochccccco...","....occcccco....","....occcccco....",".....occcco.....","......oooo......","................"],{'o':'o','b':'b0','x':'s2','c':c,'h':'s3'})
+def key(c): return (["................","................","....ooo.........","...occco........","...oc.cooooooo..","...occcccccccco.",
+ "....ooo.ococo...","........o.o.o...","................"],{'o':'o','c':c})
+art={
+0:(["................","......oooo......","....oyyyyyo.....","...oyhhyyyyo....","...oyhyyyyyo....","...oyyyyyyyo....",
+    "...oyyyyyyyo....","....oyyyyyo.....","......oooo......"],{'o':'o','y':'y0','h':'s3'}),
+1:(["................","..oooo..........",".oyyyyo...oooo..",".oyhyyo..oyyyyo.",".oyyyyo..oyhyyo.","..oooo...oyyyyo.",
+    "......oooo.ooo..",".....oyyyyo.....",".....oyhyyo.....",".....oyyyyo.....","......oooo......"],{'o':'o','y':'y0','h':'s3'}),
+2:gem('w1','w2'),3:gem('r1','s3'),4:gem('g0','g2'),5:gem('p0','s3'),
+6:potion('r1'),7:potion('w1'),8:potion('g0'),
+9:key('y0'),10:key('s2'),
+11:([".............oo.","............oso.","...........oso..","..........oso...","....o....oso....",".....o..oso.....",
+     "......oyso......","......byo.......",".....bo.o.......","....bo...o......"],{'o':'o','s':'s2','y':'y0','b':'b1'}),
+12:(["................","..oooooooooooo..","..osssssssssso..","..osrrrrrrrrso..","..osrryyyrrrso..","..osrryyyrrrso..",
+     "..osrrrrrrrrso..","...osrrrrrrso...","....osrrrrso....",".....ossso......","......ooo......."],{'o':'o','s':'s2','r':'w0','y':'y0'}),
+13:(["................","...ooo...ooo....","..orrro.orrro...",".orhrrrorrrrro..",".orrrrrrrrrrro..","..orrrrrrrrro...",
+     "...orrrrrrro....","....orrrrro.....",".....orrro......","......oro.......",".......o........"],{'o':'o','r':'r1','h':'s3'}),
+14:(["................","...oooooooooo...","..obsssssssbbo..","..obsllllllsbo..","...osssssssso...","...osllllllso...",
+     "...osssssssso...","...osllllllso...","..obsssssssbbo..","..obbsssssssbo..","...oooooooooo..."],{'o':'o','s':'sa','l':'d1','b':'b2'}),
+15:(["................","................","....oooooo......","...orrrrrro.....","..orrhrrrrro....","..orrrrrrrro....",
+     "..orrrrrrrroo...","...orrrrrrobso..","....oooooo.oso..","...........oo..."],{'o':'o','r':'r1','h':'s3','b':'s3','s':'s2'}),
+16:(["................","................","......ooo.......",".....oyyyo......","....oyhyyyo.....","...oyyyyyyyo....",
+     "..obbbbbbbbbo...","..oyyyyyyyyyo...","...ooooooooo...."],{'o':'o','y':'y1','h':'y0','b':'b0'}),
+17:(["................","...........oy...","..........o.y...","......oooo......","....oossssoo....","...osshssssso...",
+     "...osshsssssso..","...osssssssso...","....osssssso....",".....oooooo....."],{'o':'o','s':'c0','h':'s2','y':'y0'}),
+18:(["................","...oooooooooo...","..obhhhhhhhhbo..","..obbbbbbbbbbo..","..oyyyyyyyyyyo..","..obbbbyybbbbo..",
+     "..obbbbyybbbbo..","..obbbbbbbbbbo..","..oyyyyyyyyyyo..","...oooooooooo..."],{'o':'o','b':'b0','h':'b2','y':'y0'}),
+19:(["................","......oooo......",".....oyyyyo.....","....oyhhhhyo....","....oyhwwhyo....","....oyhhhhyo....",
+     ".....oyyyyo.....","......oyyo......",".....oyyyyo.....","......oooo......"],{'o':'o','y':'y0','h':'y1','w':'w1'}),
+20:(["................",".......oo.......","......oyyo......",".....oyrryo.....","....oyrhrryo....","...oyrrrrrryo...",
+     "....oyrrrryo....",".....oyrryo.....","......oyyo......",".......oo......."],{'o':'o','y':'y0','r':'p0','h':'s3'}),
+21:(["................","................","....oooooooo....","...obbbbbbbbo...","...oyyyyyyyyo...","...owwwwwwwwo...",
+     "...obbbbbbbbo...","...oyyyyyyyyo...","....oooooooo...."],{'o':'o','b':'b0','y':'y0','w':'s3'}),
+22:([".......o........","......oyo.......",".....oyyyo......","..oooyhyyooo....","..oyyyyyyyyyo...","...oyyyyyyyo....",
+     "....oyyyyyo.....","...oyyoooyyo....","...oyo...oyo....","...oo.....oo...."],{'o':'o','y':'y0','h':'s3'}),
+23:(["................","....oooooooo....","...ow.w.w.w.o...","...oooooooooo...","...os.s.s.s.o...","...oooooooooo...",
+     "...ob.b.b.b.o...","...oooooooooo..."],{'o':'o','w':'s3','s':'s2','b':'b2'}),
+}
+for i,(a,pal) in art.items():
+    a=["................"]*((16-len(a))//2)+a
+    shape(tile(i),a,pal)
+img.save('items.png')
