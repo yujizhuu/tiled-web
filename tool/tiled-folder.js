@@ -183,6 +183,7 @@
       if (fs.kind === 'handle') rememberDir(fs.root, mapPath);
       const msg = `已从文件夹「${fs.name}」打开 ${mapPath}，自动关联 ${files.size - 1} 个资源`;
       api.status(missing.length ? msg + `，缺少 ${missing.length} 个` : msg);
+      if (typeof window.__tiledAfterFolderOpen === 'function') { try { await window.__tiledAfterFolderOpen(fs, mapPath, files); } catch (e) { api.log('World 自动识别失败：' + e.message); } }
       api.log(msg + (missing.length ? '；缺少：' + missing.join(', ') : ''));
       renderRecent();
       return true;

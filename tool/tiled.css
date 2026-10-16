@@ -252,3 +252,19 @@ button[data-action="toggle-live-automap"].active{background:var(--accent2);borde
 .topbar.tb-compact .tour-entry .tour-entry-txt{display:none}
 .help-tour-btn{flex-shrink:0;background:var(--accent2);border-color:var(--accent);color:#fff;padding:5px 10px}
 .canvas-empty .empty-tour{pointer-events:auto;color:#7fb8ff;margin-left:8px;cursor:pointer;text-decoration:underline}
+/* ===== 世界自动化（0.9.7） ===== */
+.world-hover{position:absolute;z-index:3;pointer-events:none;border:2px solid #7fb8ff;background:rgba(127,184,255,.12);border-radius:2px}
+.world-hover::after{content:attr(data-label);position:absolute;left:4px;top:4px;background:#0b0d12e6;color:#e6eefc;font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.world-hover[hidden]{display:none}
+#canvasWrap.world-hovering{cursor:pointer}
+.canvas-footer{min-width:0;overflow:hidden;white-space:nowrap}
+.canvas-footer>span{flex-shrink:0}
+.world-crumb{margin-left:auto;display:inline-flex;align-items:center;gap:4px;min-width:0;flex-shrink:1!important;overflow:hidden;text-overflow:ellipsis;color:#cfe0f5}
+.world-crumb[hidden]{display:none}
+.world-crumb b{color:#fff;font-weight:600}
+.world-crumb select{background:#111319;border:1px solid var(--line);border-radius:3px;font-size:11px;padding:0 3px;height:20px}
+.world-crumb a{color:#7fb8ff;margin-left:8px;text-decoration:none}
+.world-dirty{color:#ffcf7a}
+#worldViewChk,label:has(>#worldViewChk){display:none!important}
+/* 状态栏固定宽度，避免长状态文字挤压顶栏（0.9.7） */
+.topbar[data-layout="menubar"] .status{flex:0 0 190px;width:190px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

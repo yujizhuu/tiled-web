@@ -110,7 +110,7 @@
       const olr = objectLayerRow();
       if (olr) S.push({ t: '对象层', d: '这一层是对象层：里面的点、框、圈、文字不是画面，而是告诉游戏「出生点在哪、哪里不能走、碰到哪里触发事件」。', el: () => (visible(objectLayerRow()) ? objectLayerRow() : null) });
       S.push({ t: '图块集', d: '图块集是切好格子的素材图。点一块就成为画笔；点 ⤢ 或双击可以打开大窗预览，看得更清楚。', el: () => firstVisible('.tileset-section') });
-      S.push({ t: '画布', d: '中间是地图本身。选好图块和工具，在这里点或拖着画。滚轮滚动，+ / − 缩放。', el: () => firstVisible('#canvasWrap') });
+      S.push({ t: '画布', d: '中间是地图本身。选好图块和工具，在这里点或拖着画。滚轮滚动，+ / − 缩放。如果地图属于某个 .world 世界，四周的地图会自动半透明显示，双击它们就能切换去编辑。', el: () => firstVisible('#canvasWrap') });
       if (objectRect()) S.push({ t: '地图上的对象', d: '亮起来的就是对象层里的对象：圆点是点对象（如出生点），方框 / 圆圈是区域，带字的是名字或文本。用 ⌖ 选择工具点一下，左边会显示它是什么。', rect: objectRect });
       S.push({ t: '属性面板', d: '选中图层或对象后，这里显示它的名字、位置、大小和自定义属性；上方的提示条会说明它是什么，点「详细 →」看完整解释。', el: () => firstVisible('.objects-section', '.map-section') });
       S.push({ t: '帮助', d: '不懂的地方点这个蓝色 ?（或按 F1）。每个面板标题旁的小 ? 会直接跳到对应说明。想再看一遍本引导，点旁边的 🎓 教程。祝你画得开心！', el: () => firstVisible('.help-main') });
