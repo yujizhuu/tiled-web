@@ -1,0 +1,39 @@
+name: 🐞 Bug 报告 / Bug report
+description: 报告网页版、CLI 或 MCP 的问题 / Report a problem in the web UI, CLI or MCP
+labels: [bug]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: 涉及部分 / Component
+      options: [网页版 Web UI, CLI, MCP, 示例 Examples, 文档 Docs]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: 问题描述 / What happened
+      description: 实际发生了什么，期望是什么 / Actual vs. expected behaviour
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      placeholder: |
+        1. 打开文件夹 examples/full-demo / Open folder ...
+        2. ...
+    validations: { required: true }
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境 / Environment
+      placeholder: 浏览器与版本 / OS / Node 版本 / `tiled-web version` 输出
+  - type: textarea
+    id: files
+    attributes:
+      label: 地图文件或截图 / Map files or screenshots
+      description: 最小可复现的 .tmj/.tmx/.tsx 很有帮助 / A minimal map helps a lot
+  - type: textarea
+    id: upstream
+    attributes:
+      label: 官方 Tiled 的行为 / Behaviour in official Tiled
+      description: 同一文件在桌面版 Tiled 中表现如何（可选）/ How desktop Tiled handles the same file (optional)

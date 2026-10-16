@@ -151,6 +151,17 @@ cd cli && ./test_smoke.sh
 
 `tool/` 是网页版（静态站点根目录），`cli/` 是命令行工具和 MCP 服务器，`examples/` 是示例。
 
+完整的测试命令（含浏览器测试）见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 欢迎共建
+
+tiled-web 还有很多可以一起做的事：动画帧编辑、英文界面、触屏支持、大地图性能……无论是修 bug、补文档、做测试还是加功能，都非常欢迎。
+
+- 先读 [CONTRIBUTING.md](CONTRIBUTING.md)：如何运行、测试、提交 PR。
+- 从 [`good first issue`](https://github.com/yujizhuu/tiled-web/labels/good%20first%20issue) 或 [`help wanted`](https://github.com/yujizhuu/tiled-web/labels/help%20wanted) 开始。
+- 有想法或问题，到 [Issues](https://github.com/yujizhuu/tiled-web/issues) 提出。
+- 参与即表示同意遵守 [行为准则](CODE_OF_CONDUCT.md)。
+
 ## 许可证与致谢
 
 - 代码以 [GNU AGPL-3.0](LICENSE) 发布。
@@ -203,6 +214,10 @@ Add `{"command": "node", "args": ["/path/to/tiled-web/cli/mcp-server.js"]}` unde
 
 - `examples/full-demo/build.sh` builds a sample village and an infinite cave map using every CLI command. Its output opens in official Tiled 1.11 and renders pixel-identically.
 - Not supported: desktop plugins and scripting, zstd compression, creating image layers or editing tile animations in the web UI.
+
+### Contributing
+
+Contributions are very welcome: bug fixes, docs, tests and features such as an animation editor, an English UI, touch support or large-map performance. Read [CONTRIBUTING.md](CONTRIBUTING.md), pick a [`good first issue`](https://github.com/yujizhuu/tiled-web/labels/good%20first%20issue) or [`help wanted`](https://github.com/yujizhuu/tiled-web/labels/help%20wanted) issue, and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### License
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 讨论 / Discussions
+    url: https://github.com/yujizhuu/tiled-web/discussions
+    about: 提问、想法、展示作品 / Questions, ideas and show & tell
+  - name: 官方 Tiled / Official Tiled
+    url: https://github.com/mapeditor/tiled/issues
+    about: 桌面版 Tiled 的问题请到官方仓库 / Bugs in desktop Tiled belong upstream
