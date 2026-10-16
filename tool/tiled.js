@@ -346,12 +346,17 @@
       const cell = document.createElement('button');
       cell.className = 'tile-cell' + (active ? ' active' : '');
       cell.title = `图块 ${i} / GID ${t.firstgid + i}`;
-      const img = document.createElement('img');
-      img.src = t.url;
-      img.style.objectPosition = `-${col * t.tileWidth}px -${row * t.tileHeight}px`;
-      img.style.width = `${t.columns * t.tileWidth}px`;
-      img.style.height = `${Math.ceil(t.count / t.columns) * t.tileHeight}px`;
-      cell.appendChild(img);
+      // 每格用 canvas 画出单个图块（考虑 margin/spacing）；图片未加载完时等 onload 再画
+      const thumb = document.createElement('canvas');
+      thumb.width = t.tileWidth; thumb.height = t.tileHeight; thumb.className = 'tile-thumb';
+      const sx = (t.margin || 0) + col * (t.tileWidth + (t.spacing || 0));
+      const sy = (t.margin || 0) + row * (t.tileHeight + (t.spacing || 0));
+      const paint = (im) => { const c = thumb.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, thumb.width, thumb.height); c.drawImage(im, sx, sy, t.tileWidth, t.tileHeight, 0, 0, t.tileWidth, t.tileHeight); };
+      const im = imageCache.get(t.url);
+      if (im && im.complete && im.naturalWidth) paint(im);
+      else if (im) im.addEventListener('load', () => paint(im), { once: true });
+      else { const ni = new Image(); ni.onload = () => paint(ni); ni.src = t.url; }
+      cell.appendChild(thumb);
       const n = document.createElement('span'); n.textContent = i; cell.appendChild(n);
       cell.onclick = (e) => {
         const old = state.tileSelection;
