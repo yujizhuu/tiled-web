@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web MCP server (stdio, JSON-RPC 2.0) — Phase 7
+ * tiled-web MCP server (stdio, JSON-RPC 2.0)
  * Zero npm deps. Spawns the sibling CLI binary so tool behavior matches CLI.
  *
  * Cursor / Claude Desktop example (~/.cursor/mcp.json or Claude config):
@@ -29,7 +29,7 @@ const PROTOCOL_VERSION = '2024-11-05';
 const TOOLS = [
   {
     name: 'tiled_version',
-    description: 'Return tiled-web CLI version and phase',
+    description: 'Return tiled-web CLI version and license',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     buildArgs: () => ['version'],
   },

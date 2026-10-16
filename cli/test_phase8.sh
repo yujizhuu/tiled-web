@@ -7,8 +7,8 @@ TMP="$ROOT/tmp_smoke/phase8"
 rm -rf "$TMP"; mkdir -p "$TMP/sub"
 J() { python3 -c "import sys,json; d=json.load(open('$1')); $2"; }
 
-echo "== version 0.7.1 =="
-"${CLI[@]}" version | grep -q '0.7.1'
+echo "== version =="
+"${CLI[@]}" version | grep -qE 'tiled-web [0-9]+\.'
 
 echo "== TMJ root type=map =="
 "${CLI[@]}" new --width 4 --height 3 --tilewidth 16 --tileheight 16 -o "$TMP/sub/m.tmj" >/dev/null

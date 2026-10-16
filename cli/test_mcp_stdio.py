@@ -83,7 +83,7 @@ send(
 )
 r3 = read_msg()
 text = r3["result"]["content"][0]["text"]
-assert "0.7.1" in text and "phase: 7" in text, text
+assert "tiled-web" in text and "formats:" in text, text
 proc.terminate()
 try:
     proc.wait(timeout=2)

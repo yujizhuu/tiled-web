@@ -2,7 +2,6 @@
 # 本地 web 工具通用启动器：复用已有匹配 Tab；有窗口则只加 Tab；无窗口不 make new window。
 # 通道优先级（用户可见打开）：用户 Google Chrome（正在用的窗口/会话）> Playwright Chrome > IDE 浏览器
 # 验收：开页前后 `pgrep -x "Google Chrome"` 主进程 PID 集不得新增（同 App 新 PID = 仍违规）
-# 本脚本只服务优先级 1；见 柱子AI/标准/工具工程标准.md §1.5
 open_local_web_url() {
   local url="${1:-}"
   if [[ -z "${url}" ]]; then

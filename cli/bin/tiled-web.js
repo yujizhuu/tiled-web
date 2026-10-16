@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 7 (agent goal met: template index / prop types useAs+expand / TMX infinite+zlib)
+ * tiled-web CLI — command-line editing for Tiled maps (TMJ/TMX)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -64,7 +64,7 @@ const { listWang, listTerrain } = require('../lib/wang');
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 7 CLI (agent goal met)
+  const text = `tiled-web ${PKG.version} — command-line tools for Tiled maps
 
 Usage:
   tiled-web version
@@ -193,7 +193,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6; 0.7.1 upstream-conformance fixes; 0.9.0 web folder workspace)\n`);
+  process.stdout.write(`formats: TMJ / TMX (Tiled 1.2+), CSV export\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 

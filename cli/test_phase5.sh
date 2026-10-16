@@ -9,7 +9,7 @@ rm -rf "$TMP"
 mkdir -p "$TMP"
 
 echo "== version (phase5 suite; CLI may be newer) =="
-"${CLI[@]}" version | grep -qE '0\.[5-9]|phase: [5-9]'
+"${CLI[@]}" version | grep -qE 'formats:'
 
 echo "== stamp copy/paste =="
 "${CLI[@]}" new --width 10 --height 8 --tilewidth 16 --tileheight 16 -o "$TMP/stamp_map.tmj"

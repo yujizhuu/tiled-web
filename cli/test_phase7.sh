@@ -8,9 +8,9 @@ FIX="$ROOT/fixtures"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 
-echo "== version 0.7.1 =="
-"${CLI[@]}" version | grep -q '0.7.1'
-"${CLI[@]}" version | grep -q 'phase: 7'
+echo "== version =="
+"${CLI[@]}" version | grep -qE 'tiled-web [0-9]+\.'
+"${CLI[@]}" version | grep -q 'formats:'
 
 echo "== template index =="
 IDX=$("${CLI[@]}" template index "$FIX/templates")

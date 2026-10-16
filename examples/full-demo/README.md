@@ -1,6 +1,6 @@
 # 像素村 · tiled-web CLI 全功能示例
 
-用 **tiled-web CLI 0.7.1**（`cli/bin/tiled-web.js`）从零做一张小村庄关卡 + 一个无限大洞穴，
+用 tiled-web CLI（`cli/bin/tiled-web.js`）从零做一张小村庄关卡 + 一个无限大洞穴，
 把 `tiled-web --help` 里**每一个命令和子命令**都实际用一遍，并用**上游官方 Tiled 1.11**（`tiled` / `tmxrasterizer`）验证结果。
 
 ```bash
@@ -51,25 +51,8 @@ bash validate.sh         # （可选）需要 apt 安装 tiled xvfb：用官方 
 | 14 | 文本信息、导出全部格式，TMX→TMJ 回读 | `info --format text`、`export -f tmj|tmx|csv`、`--encoding base64 --compression zlib|gzip` |
 | 15 | 渲染预览图 | `render.py` |
 
-**覆盖情况：`--help` 中所有命令、子命令都已用到。** 只读/GUI 专属能力（实时自动地图、Wang 笔刷手感、撤销栈）不在 CLI 范围，仍在 `tool/` 网页里。
+`--help` 中的所有命令和子命令都已用到。实时自动地图、Wang 笔刷、撤销等交互功能请在网页版中使用。
 
-## 对照上游 Tiled 发现并修复的问题（0.7.1）
+## 用官方 Tiled 校验
 
-`validate.sh` 的三项检查全部通过：官方 `tmxrasterizer` 能打开全部产物（TMX csv/zlib/gzip 与 TMJ 渲染逐像素一致）；
-`tiled --export-map` 解析后的图块/翻转位/对象/属性与 CLI 结果一致；上游 AutoMapper 跑同一套规则得到的 Shadow 层与 CLI **完全一致**。
-
-修复前发现的问题：
-
-1. **属性格式**：CLI 写的是 Tiled ≤1.1 的 `{"k": v}`，但文件头标 1.2；Tiled 1.2+ 规定为 `[{name,type,value}]`。现在统一写数组（旧格式仍可读）。
-2. **TMX 导出丢数据**：没有 `<properties>`（地图/图层/对象/图块集）、`nextlayerid/nextobjectid`、对象 `template`、`<image width/height>`、内嵌图块集的地形/Wang。全部补齐，并修正 TMX 读取时对象层“偷”第一个对象属性的问题。
-3. **外部图块集引用**：TMJ 里应只有 `{firstgid, source}`；之前多写了 name/tilewidth 等。`--source/--image` 按当前目录给的相对路径现在会自动改写成相对地图文件（Tiled 的约定）。
-4. **`--embed`**：.tsx 的图片路径没有改成相对地图，地形/Wang 也丢了 → 已修复（按 Tiled 1.2 JSON：`terrains`、`tiles[].terrain`、`wangsets[].cornercolors/edgecolors/wangtiles`）。
-5. **wang list**：读不了官方 JSON 的 `cornercolors/edgecolors`；外部 .tsx 的 `tileCount` 总是 0 → 已修复。
-6. **GID 掩码**：用的是 `0x1fffffff`，上游清除 4 个标志位（含六边形 120° `0x10000000`）→ 改为 `0x0fffffff`。
-7. **模板路径**：对象的 `template` 只写了文件名，Tiled 会去地图目录找 → 改为相对地图的路径。
-8. **坐标换算**：交错地图行高用了 0.75×（上游是 tileheight/2）；六边形 / 交错的 pixel→tile 只是矩形近似。现在逐行移植上游 `HexagonalRenderer` / `StaggeredRenderer`。原测试里的 (80,24)→(2,1) 其实是错的（上游为 (2,0)）。
-9. **MCP 帧格式**：无论客户端用什么都用 `Content-Length` 回包；MCP 规范的 stdio 是逐行 JSON。现在按客户端格式回包（默认逐行）。
-10. **自定义类型存放位置**：上游存在项目文件 `.tiled-project` 的 `propertyTypes`（带 id）。`prop types …` 现在可以直接操作 `.tiled-project`（地图内的 `propertytypes` 保留为 CLI 扩展，Tiled 会忽略）。
-11. 其它：TMJ 根加 `"type": "map"`；正交 TMX 读入不再凭空加 `staggeraxis`；`world add-map` 不填尺寸时从地图读取。
-
-回归测试：`cli/test_phase8.sh`（已接入 `cli/test_smoke.sh`）。
+`validate.sh` 做三项检查：官方 `tmxrasterizer` 能打开全部产物，且 TMX（csv/zlib/gzip）与 TMJ 的渲染逐像素一致；`tiled --export-map` 解析出的图块、翻转位、对象和属性与 CLI 结果一致；官方 AutoMapper 用同一套规则生成的 Shadow 层与 CLI 完全一致。

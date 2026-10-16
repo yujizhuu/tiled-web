@@ -1,4 +1,4 @@
-# Automap fixture (Phase 4 smoke)
+# Automap fixture
 
 Minimal Tiled-style AutoMap setup:
 
@@ -8,6 +8,6 @@ Minimal Tiled-style AutoMap setup:
 
 After `tiled-web automap work.tmj --rules rules.txt`, both matched cells become gid **9**.
 
-## CLI subset limits
+## Limits
 
-See main README Phase 4 notes: no live automap, no rule editor UI, no AutomappingRadius clipping, finite layers only.
+The CLI applies rules in one batch (no live automap, no visual rule editor). Use `--radius N --x X --y Y` to limit the area.

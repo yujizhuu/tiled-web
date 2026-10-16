@@ -8,9 +8,9 @@ FIX="$ROOT/fixtures"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 
-echo "== version 0.7.1 =="
-"${CLI[@]}" version | grep -q '0.7.1'
-"${CLI[@]}" version | grep -q 'phase: 7'
+echo "== version =="
+"${CLI[@]}" version | grep -qE 'tiled-web [0-9]+\.'
+"${CLI[@]}" version | grep -q 'formats:'
 
 echo "== coord orthogonal =="
 "${CLI[@]}" new --width 10 --height 8 --tilewidth 16 --tileheight 16 -o "$TMP/ortho.tmj"
