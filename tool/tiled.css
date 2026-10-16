@@ -99,3 +99,27 @@ button[data-action="toggle-live-automap"].active{background:var(--accent2);borde
   .tool-mode-btn{padding:3px 6px;font-size:11px}
   .zoom input{width:52px}
 }
+.help-q{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px!important;min-width:0!important;padding:0!important;margin-left:5px;border-radius:50%;font-size:10px!important;line-height:1;color:var(--muted);background:#1d2129;border-color:#3a414e;vertical-align:middle}
+.help-q:hover{color:#fff;border-color:var(--accent)}
+.help-q.help-main{width:30px;height:30px!important;font-size:15px!important;font-weight:700;color:#fff;background:var(--accent2);border-color:var(--accent);margin-left:4px;flex-shrink:0}
+.help-panel{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:80}
+.help-panel.hidden{display:none}
+.help-inner{background:var(--panel);border:1px solid var(--line);border-radius:8px;width:min(980px,94vw);height:min(720px,90vh);display:flex;flex-direction:column;box-shadow:0 12px 40px #0008}
+.help-inner header{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:600}
+.help-inner header span{flex-shrink:0}
+.help-inner header input{flex:1;background:#111319;border:1px solid var(--line);color:var(--text);padding:6px 8px;border-radius:4px}
+.help-body{flex:1;min-height:0;display:grid;grid-template-columns:220px 1fr}
+.help-toc{overflow:auto;border-right:1px solid var(--line);padding:6px 0}
+.help-toc .help-group{padding:8px 12px 3px;color:var(--muted);font-size:11px}
+.help-toc a{display:block;padding:4px 12px 4px 18px;color:#c8ceda;text-decoration:none;font-size:12px}
+.help-toc a:hover,.help-toc a.active{background:var(--accent2);color:#fff}
+.help-content{overflow:auto;padding:4px 20px 40px;line-height:1.65;font-size:13px;position:relative}
+.help-article{border-bottom:1px solid var(--line);padding:10px 0 14px}
+.help-article h3{margin:6px 0 2px;font-size:16px;color:#fff}
+.help-article h4{margin:10px 0 2px;font-size:12px;color:var(--accent)}
+.help-article p,.help-article ol{margin:2px 0;color:#c8ceda}
+.help-article ol{padding-left:20px}
+.help-summary{color:var(--muted)!important}
+.help-example{background:#111319;border-left:3px solid var(--accent);padding:6px 10px!important;margin-top:8px!important}
+.help-note{color:#e8c070!important;font-size:12px;margin-top:6px!important}
+.section-head>span:first-child{white-space:nowrap;display:inline-flex;align-items:center}.layers-section .section-actions button{padding:1px 5px}

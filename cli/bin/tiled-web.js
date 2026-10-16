@@ -193,7 +193,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6; 0.7.1 upstream-conformance fixes; 0.8.0 web folder workspace)\n`);
+  process.stdout.write(`phase: 7 (agent CLI complete: template-index/prop-types-useAs+expand/TMX-infinite+zlib + phases 1–6; 0.7.1 upstream-conformance fixes; 0.9.0 web folder workspace)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
