@@ -4,10 +4,11 @@
  * Batch GID replace — terrain-ish helper for agents.
  * Replaces raw stored GIDs (including flip bits) matching --from with --to.
  * Optional --layer; omit = all tile layers.
+ * Works on infinite/chunked layers via setTileAt.
  */
 
-const { walkLayers, ensureLayerData, tileAt } = require('./util');
-const { decodeGid, applyFlipFlags } = require('./gid');
+const { walkLayers, ensureLayerData, tileAt, setTileAt, layerBounds } = require('./util');
+const { decodeGid } = require('./gid');
 
 function replaceGid(map, { from, to, layer: layerSpec, matchFlips = false } = {}) {
   const fromGid = Number(from);
@@ -31,22 +32,39 @@ function replaceGid(map, { from, to, layer: layerSpec, matchFlips = false } = {}
   const perLayer = [];
   for (const layer of targets) {
     ensureLayerData(layer, map);
-    const w = layer.width || map.width;
-    const h = layer.height || map.height;
     let n = 0;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
+    let minX;
+    let minY;
+    let maxX;
+    let maxY;
+    if (map.infinite || (layer.chunks && layer.chunks.length)) {
+      const b = layerBounds(layer, map);
+      if (!Number.isFinite(b.x)) {
+        perLayer.push({ id: layer.id, name: layer.name, replaced: 0 });
+        continue;
+      }
+      minX = b.x;
+      minY = b.y;
+      maxX = b.x + b.width - 1;
+      maxY = b.y + b.height - 1;
+    } else {
+      minX = 0;
+      minY = 0;
+      maxX = (layer.width || map.width) - 1;
+      maxY = (layer.height || map.height) - 1;
+    }
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
         const raw = tileAt(layer, x, y, map) >>> 0;
         let hit = false;
         if (matchFlips) {
           hit = raw === (fromGid >>> 0);
         } else {
-          // match base tile id only; preserve destination flip bits from --to as given
           const d = decodeGid(raw);
           hit = d.id === fromDecoded.id;
         }
         if (hit) {
-          layer.data[y * w + x] = toGid >>> 0;
+          setTileAt(layer, x, y, toGid, map);
           n += 1;
         }
       }

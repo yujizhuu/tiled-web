@@ -1,0 +1,15 @@
+{
+  "type": "template",
+  "object": {
+    "name": "Chest",
+    "type": "Loot",
+    "x": 0,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "properties": {
+      "gold": 10,
+      "locked": true
+    }
+  }
+}

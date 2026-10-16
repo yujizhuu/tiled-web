@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 4 (automap / world / replace-gid + Phase 1–3)
+ * tiled-web CLI — Phase 5 (stamp / template / infinite + Phase 1–4)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -32,7 +32,7 @@ const {
   summarizeObject,
   addObjectLayer,
 } = require('../lib/objects');
-const { listProps, getProp, setProp, removeProp, resolveOwner } = require('../lib/props');
+const { listProps, getProp, setProp, removeProp, resolveOwner, listPropertyTypes, getPropertyType } = require('../lib/props');
 const { applyFlipFlags, decodeGid } = require('../lib/gid');
 const { applyAutomapToMap } = require('../lib/automap');
 const {
@@ -45,15 +45,17 @@ const {
   relativizeMapFile,
 } = require('../lib/world');
 const { replaceGid } = require('../lib/replace');
+const { copyStamp, pasteStamp, loadStamp, writeStampFile } = require('../lib/stamp');
+const { loadTemplate, templateInfo, applyTemplate } = require('../lib/template');
 
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 4 CLI (automap / world / replace-gid)
+  const text = `tiled-web ${PKG.version} — Phase 5 CLI (stamp / template / infinite)
 
 Usage:
   tiled-web version
-  tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] -o map.tmj
+  tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal|isometric|hexagonal] -o map.tmj
   tiled-web info <map.tmj|map.tmx> [--format json|text]
   tiled-web export <map.tmj|map.tmx> -f tmj|tmx|csv -o <out>
 
@@ -63,6 +65,12 @@ Usage:
                  [--flip-h] [--flip-v] [--flip-d] [-o out]
   tiled-web get-layer <map> [--layer name|index] [--format json|csv] [-o out]
   tiled-web replace-gid <map> --from GID --to GID [--layer name|index] [--match-flips] [-o out]
+
+  tiled-web stamp copy <map> --layer name|index --x X --y Y --width W --height H -o stamp.json
+  tiled-web stamp paste <map> --layer name|index --x X --y Y --stamp stamp.json [-o out]
+
+  tiled-web template info <file.tx|file.tj|file.json>
+  tiled-web template apply <map> --layer <objectlayer> --template <file> --x X --y Y [--create-layer] [-o out]
 
   tiled-web layer list <map>
   tiled-web layer add <map> [--name NAME] [--type tile|object] [-o out]
@@ -85,8 +93,10 @@ Usage:
   tiled-web prop get  <map> --target ... --name KEY
   tiled-web prop set  <map> --target ... --name KEY --value VAL [--type string|int|float|bool] [-o out]
   tiled-web prop remove <map> --target ... --name KEY [-o out]
+  tiled-web prop types list <map>
+  tiled-web prop types get <map> --name TypeName
 
-  tiled-web automap <map> --rules <rules.txt|rules.json|dir|rule.tmj> [-o out]
+  tiled-web automap <map> --rules <rules.txt|rules.json|dir|rule.tmj> [--radius N] [--x X] [--y Y] [-o out]
 
   tiled-web world info <file.world>
   tiled-web world new -o file.world
@@ -96,8 +106,12 @@ Usage:
 Notes:
   - Mutations write in-place unless -o / --output is set.
   - Default --layer for tile cmds is the first tile layer.
+  - Infinite maps (--infinite / map.infinite): set-tile/fill/get-layer/stamp/replace-gid use chunks[].
+  - Stamp paste clips to map bounds on finite maps; infinite writes all cells (creates chunks).
+  - Template apply places an object instance (pixel --x/--y); supports .tx and JSON.
+  - Automap --radius N with --x/--y clips the scan region (also uses rule AutomappingRadius when center given).
+  - Tile --x/--y are tile indices (works for hex/iso data grids; no pixel↔tile helper yet).
   - Object identity for prop --target object: --layer + --id (or --object-name).
-  - Automap: Tiled-style Regions + Input_*/Output_* (see fixtures/automap/); subset vs browser.
   - TMX support is minimal orthogonal (CSV data).
   - Browser UI under tool/ is unchanged. MCP wrapper is optional future.
 
@@ -120,7 +134,10 @@ function parseArgs(argv) {
     if (a.startsWith('--')) {
       const key = a.slice(2);
       const next = args[i + 1];
-      if (next == null || next.startsWith('-')) {
+      // Allow numeric negatives like --x -2 (not a flag)
+      const nextIsValue =
+        next != null && (!next.startsWith('-') || /^-?\d+(\.\d+)?$/.test(next));
+      if (!nextIsValue) {
         flags[key] = true;
       } else {
         flags[key] = next;
@@ -150,7 +167,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 4 (automap/world/replace-gid + objects/props/layers/tiles + create/info/export)\n`);
+  process.stdout.write(`phase: 5 (stamp/template/infinite + automap/world/objects/props/layers/tiles + create/info/export)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -162,6 +179,8 @@ function cmdNew(flags) {
     height: flags.height,
     tilewidth: flags.tilewidth || flags.tileWidth || 32,
     tileheight: flags.tileheight || flags.tileHeight || 32,
+    infinite: !!(flags.infinite),
+    orientation: flags.orientation || 'orthogonal',
   });
   writeText(out, JSON.stringify(map, null, 2) + '\n');
   ok({
@@ -170,6 +189,8 @@ function cmdNew(flags) {
     height: map.height,
     tilewidth: map.tilewidth,
     tileheight: map.tileheight,
+    infinite: !!map.infinite,
+    orientation: map.orientation,
   });
 }
 
@@ -203,11 +224,11 @@ function cmdExport(positional, flags) {
 function cmdSetTile(positional, flags) {
   const file = positional[0];
   if (!file) die('set-tile requires a map path');
-  const x = parseIntFlag(flags.x, 'x', { min: 0, allowZero: true });
-  const y = parseIntFlag(flags.y, 'y', { min: 0, allowZero: true });
+  const map = loadMap(file);
+  const x = parseIntFlag(flags.x, 'x', { min: map.infinite ? null : 0, allowZero: true, allowNegative: !!map.infinite });
+  const y = parseIntFlag(flags.y, 'y', { min: map.infinite ? null : 0, allowZero: true, allowNegative: !!map.infinite });
   let gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
   gid = applyFlipFlags(gid, flags);
-  const map = loadMap(file);
   const layer = resolveLayer(map, flags.layer, { tileOnly: true, required: true });
   const written = setTileAt(layer, x, y, gid, map);
   const saved = saveMap(map, { output: flags.output, inPlacePath: file });
@@ -225,13 +246,13 @@ function cmdSetTile(positional, flags) {
 function cmdFill(positional, flags) {
   const file = positional[0];
   if (!file) die('fill requires a map path');
-  const x = parseIntFlag(flags.x, 'x', { min: 0, allowZero: true });
-  const y = parseIntFlag(flags.y, 'y', { min: 0, allowZero: true });
+  const map = loadMap(file);
+  const x = parseIntFlag(flags.x, 'x', { min: map.infinite ? null : 0, allowZero: true, allowNegative: !!map.infinite });
+  const y = parseIntFlag(flags.y, 'y', { min: map.infinite ? null : 0, allowZero: true, allowNegative: !!map.infinite });
   const width = parseIntFlag(flags.width, 'width', { min: 1 });
   const height = parseIntFlag(flags.height, 'height', { min: 1 });
   let gid = parseIntFlag(flags.gid, 'gid', { min: 0, allowZero: true });
   gid = applyFlipFlags(gid, flags);
-  const map = loadMap(file);
   const layer = resolveLayer(map, flags.layer, { tileOnly: true, required: true });
   const result = fillRect(map, layer, { x, y, width, height, gid });
   const saved = saveMap(map, { output: flags.output, inPlacePath: file });
@@ -275,6 +296,10 @@ function cmdGetLayer(positional, flags) {
     layer: { id: gids.id, name: gids.name },
     width: gids.width,
     height: gids.height,
+    x: gids.x != null ? gids.x : 0,
+    y: gids.y != null ? gids.y : 0,
+    infinite: !!gids.infinite,
+    chunkCount: gids.chunkCount,
     data: gids.data,
   };
   const body = JSON.stringify(payload, null, 2) + '\n';
@@ -453,8 +478,36 @@ function cmdObject(positional, flags) {
 
 function cmdProp(positional, flags) {
   const sub = positional[0];
+  if (!sub) die('prop requires subcommand: list|get|set|remove|types');
+
+  // prop types list|get <map>
+  if (sub === 'types' || sub === 'type' || sub === 'propertytypes') {
+    const tsub = positional[1];
+    const file = positional[2];
+    if (!tsub) die('prop types requires subcommand: list|get');
+    if (!file) die(`prop types ${tsub} requires a map path`);
+    const map = loadMap(file);
+    if (tsub === 'list') {
+      process.stdout.write(
+        JSON.stringify(
+          { file: path.resolve(file), propertytypes: listPropertyTypes(map) },
+          null,
+          2
+        ) + '\n'
+      );
+      return;
+    }
+    if (tsub === 'get') {
+      const rec = getPropertyType(map, flags.name);
+      process.stdout.write(
+        JSON.stringify({ file: path.resolve(file), ...rec }, null, 2) + '\n'
+      );
+      return;
+    }
+    die(`Unknown prop types subcommand: ${tsub} (use list|get)`);
+  }
+
   const file = positional[1];
-  if (!sub) die('prop requires subcommand: list|get|set|remove');
   if (!file) die(`prop ${sub} requires a map path`);
 
   const map = loadMap(file);
@@ -519,6 +572,84 @@ function cmdProp(positional, flags) {
 }
 
 
+
+function cmdStamp(positional, flags) {
+  const sub = positional[0];
+  const file = positional[1];
+  if (!sub) die('stamp requires subcommand: copy|paste');
+  if (!file) die(`stamp ${sub} requires a map path`);
+
+  if (sub === 'copy') {
+    const out = flags.output;
+    if (!out) die('stamp copy requires -o / --output <stamp.json>');
+    const map = loadMap(file);
+    const stamp = copyStamp(map, {
+      layer: flags.layer,
+      x: flags.x,
+      y: flags.y,
+      width: flags.width,
+      height: flags.height,
+    });
+    const written = writeStampFile(stamp, out);
+    ok({ action: 'stamp-copy', ...written, source: stamp.source });
+    return;
+  }
+  if (sub === 'paste') {
+    const stampPath = flags.stamp;
+    if (!stampPath || stampPath === true) die('stamp paste requires --stamp <stamp.json>');
+    const map = loadMap(file);
+    const stamp = loadStamp(stampPath);
+    const result = pasteStamp(map, {
+      layer: flags.layer,
+      x: flags.x,
+      y: flags.y,
+      stamp,
+    });
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({ action: 'stamp-paste', ...result, stamp: path.resolve(stampPath), ...saved });
+    return;
+  }
+  die(`Unknown stamp subcommand: ${sub} (use copy|paste)`);
+}
+
+function cmdTemplate(positional, flags) {
+  const sub = positional[0];
+  if (!sub) die('template requires subcommand: info|apply');
+
+  if (sub === 'info') {
+    const file = positional[1];
+    if (!file) die('template info requires a template path (.tx / .tj / .json)');
+    const tpl = loadTemplate(file);
+    process.stdout.write(JSON.stringify(templateInfo(tpl, file), null, 2) + '\n');
+    return;
+  }
+  if (sub === 'apply') {
+    const file = positional[1];
+    if (!file) die('template apply requires a map path');
+    const tplPath = flags.template;
+    if (!tplPath || tplPath === true) die('template apply requires --template <file.tx|file.json>');
+    const map = loadMap(file);
+    const tpl = loadTemplate(tplPath);
+    const { layer, object } = applyTemplate(map, {
+      layer: flags.layer,
+      template: tpl,
+      x: flags.x,
+      y: flags.y,
+      createLayer: !!(flags['create-layer'] || flags.createLayer),
+    });
+    const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+    ok({
+      action: 'template-apply',
+      template: path.resolve(tplPath),
+      layer: { id: layer.id, name: layer.name },
+      object: summarizeObject(object),
+      ...saved,
+    });
+    return;
+  }
+  die(`Unknown template subcommand: ${sub} (use info|apply)`);
+}
+
 function cmdReplaceGid(positional, flags) {
   const file = positional[0];
   if (!file) die('replace-gid requires a map path');
@@ -541,7 +672,12 @@ function cmdAutomap(positional, flags) {
   const rules = flags.rules;
   if (!rules || rules === true) die('automap requires --rules <rules.txt|rules.json|dir|rule.tmj>');
   const map = loadMap(file);
-  const result = applyAutomapToMap(map, rules);
+  const radius = flags.radius != null && flags.radius !== true ? flags.radius : undefined;
+  const result = applyAutomapToMap(map, rules, {
+    radius,
+    x: flags.x != null && flags.x !== true ? flags.x : undefined,
+    y: flags.y != null && flags.y !== true ? flags.y : undefined,
+  });
   const saved = saveMap(map, { output: flags.output, inPlacePath: file });
   ok({
     action: 'automap',
@@ -549,6 +685,7 @@ function cmdAutomap(positional, flags) {
     ruleFiles: result.ruleFiles,
     ruleCount: result.ruleCount,
     warnings: result.warnings,
+    clip: result.clip,
     appliedSample: result.applied.slice(0, 20),
     appliedTotal: result.applied.length,
     ...saved,
@@ -665,6 +802,13 @@ function main() {
       case 'replacegid':
       case 'replace':
         cmdReplaceGid(positional, flags);
+        break;
+      case 'stamp':
+        cmdStamp(positional, flags);
+        break;
+      case 'template':
+      case 'tpl':
+        cmdTemplate(positional, flags);
         break;
       case 'help':
         usage(0);

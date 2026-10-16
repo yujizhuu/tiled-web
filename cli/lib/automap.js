@@ -8,15 +8,14 @@
  *   - Rule maps as .tmj (or .tmx via loadMap)
  *   - Regions / regions / regions_input (+ optional regions_output)
  *   - Input_* / InputNot_* / Output_* tile layers (and input_ / output_ variants)
- *   - Map props: DeleteTiles, MatchOutsideMap, AutomappingRadius (radius ignored for full-map CLI apply)
+ *   - Map props: DeleteTiles, MatchOutsideMap, AutomappingRadius
  *   - StrictEmpty on input layers
  *   - Object-group Output_* cloning (pixel offset)
+ *   - Optional CLI clip: --radius N --x X --y Y (and/or rule AutomappingRadius with center)
  *
  * Limits vs browser UI:
  *   - No live/while-drawing automap
  *   - No rule visual editor / browser preview
- *   - No AutomappingRadius region clipping (full-map scan always)
- *   - Infinite / chunked layers not supported (same as Phase 2 writes)
  *   - Rule and work maps should share the same firstgid scheme for meaningful matches
  */
 
@@ -437,15 +436,37 @@ function applyRuleAt(compiled, rule, workMap, ox, oy) {
   }
 }
 
-function runAutomap(workMap, compiledRules) {
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * Optional clip region: { minX, minY, maxX, maxY } in tile coords (inclusive).
+ * When set, only try rule origins whose input rect intersects the clip.
+ */
+function runAutomap(workMap, compiledRules, { region = null } = {}) {
   let matches = 0;
   const applied = [];
+  const W = workMap.width;
+  const H = workMap.height;
   for (const compiled of compiledRules) {
     for (let ri = 0; ri < compiled.rules.length; ri++) {
       const rule = compiled.rules[ri];
       const ir = rule.inRect;
-      for (let oy = 0; oy <= workMap.height - ir.h; oy++) {
-        for (let ox = 0; ox <= workMap.width - ir.w; ox++) {
+      let oy0 = 0;
+      let oy1 = H - ir.h;
+      let ox0 = 0;
+      let ox1 = W - ir.w;
+      if (region) {
+        // Origins where inRect overlaps region
+        ox0 = Math.max(0, region.minX - (ir.w - 1));
+        oy0 = Math.max(0, region.minY - (ir.h - 1));
+        ox1 = Math.min(W - ir.w, region.maxX);
+        oy1 = Math.min(H - ir.h, region.maxY);
+      }
+      if (oy1 < oy0 || ox1 < ox0) continue;
+      for (let oy = oy0; oy <= oy1; oy++) {
+        for (let ox = ox0; ox <= ox1; ox++) {
           if (matchRuleAt(compiled, rule, workMap, ox, oy)) {
             applyRuleAt(compiled, rule, workMap, ox, oy);
             matches += 1;
@@ -455,7 +476,38 @@ function runAutomap(workMap, compiledRules) {
       }
     }
   }
-  return { matches, applied };
+  return { matches, applied, region: region || null };
+}
+
+/**
+ * Build a clip region from --radius and optional center (--x/--y).
+ * Also folds in max AutomappingRadius from compiled rules when radius omitted but center given.
+ */
+function buildClipRegion(workMap, compiledRules, { radius, x, y } = {}) {
+  let r = radius != null ? Number(radius) : null;
+  if (r == null || !Number.isFinite(r) || r < 0) {
+    // use max rule radius if center provided
+    if (x == null || y == null) return null;
+    r = 0;
+    for (const c of compiledRules) {
+      if (c.radius && c.radius > r) r = c.radius;
+    }
+  }
+  if (!Number.isFinite(r) || r < 0) return null;
+  const cx = x != null ? Number(x) : Math.floor(workMap.width / 2);
+  const cy = y != null ? Number(y) : Math.floor(workMap.height / 2);
+  if (!Number.isInteger(cx) || !Number.isInteger(cy)) {
+    throw new Error('automap --x/--y must be integers when used with --radius');
+  }
+  return {
+    minX: clamp(cx - r, 0, workMap.width - 1),
+    minY: clamp(cy - r, 0, workMap.height - 1),
+    maxX: clamp(cx + r, 0, workMap.width - 1),
+    maxY: clamp(cy + r, 0, workMap.height - 1),
+    centerX: cx,
+    centerY: cy,
+    radius: r,
+  };
 }
 
 /**
@@ -568,14 +620,20 @@ function loadCompiledRules(rulesPath) {
   };
 }
 
-function applyAutomapToMap(workMap, rulesPath) {
+function applyAutomapToMap(workMap, rulesPath, opts = {}) {
   const loaded = loadCompiledRules(rulesPath);
-  const result = runAutomap(workMap, loaded.compiled);
+  const region = buildClipRegion(workMap, loaded.compiled, {
+    radius: opts.radius,
+    x: opts.x,
+    y: opts.y,
+  });
+  const result = runAutomap(workMap, loaded.compiled, { region });
   return {
     ...result,
     ruleFiles: loaded.files,
     ruleCount: loaded.ruleCount,
     warnings: loaded.warnings,
+    clip: region,
   };
 }
 
@@ -585,6 +643,7 @@ module.exports = {
   applyAutomapToMap,
   runAutomap,
   resolveRuleFiles,
+  buildClipRegion,
   // exported for tests / reuse
   extractRegions,
   parseInputLayerName,

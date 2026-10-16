@@ -2,6 +2,7 @@
 
 /**
  * Create an empty orthogonal TMJ-compatible map object.
+ * Pass infinite:true for chunked layers (Tiled infinite maps).
  */
 function createEmptyMap({
   width = 24,
@@ -9,37 +10,42 @@ function createEmptyMap({
   tilewidth = 32,
   tileheight = 32,
   layerName = 'Layer 1',
+  infinite = false,
+  orientation = 'orthogonal',
 } = {}) {
   const w = assertPositiveInt(width, 'width');
   const h = assertPositiveInt(height, 'height');
   const tw = assertPositiveInt(tilewidth, 'tilewidth');
   const th = assertPositiveInt(tileheight, 'tileheight');
+  const layer = {
+    id: 1,
+    name: layerName,
+    type: 'tilelayer',
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    opacity: 1,
+    visible: true,
+  };
+  if (infinite) {
+    layer.chunks = [];
+  } else {
+    layer.data = Array(w * h).fill(0);
+  }
   return {
     version: '1.2',
     tiledversion: '1.2.4',
-    orientation: 'orthogonal',
+    orientation: String(orientation || 'orthogonal'),
     renderorder: 'right-down',
     width: w,
     height: h,
     tilewidth: tw,
     tileheight: th,
-    infinite: false,
+    infinite: !!infinite,
     nextlayerid: 2,
     nextobjectid: 1,
-    layers: [
-      {
-        id: 1,
-        name: layerName,
-        type: 'tilelayer',
-        x: 0,
-        y: 0,
-        width: w,
-        height: h,
-        opacity: 1,
-        visible: true,
-        data: Array(w * h).fill(0),
-      },
-    ],
+    layers: [layer],
     tilesets: [],
   };
 }

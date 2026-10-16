@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+  <object id="1" name="Spawn" type="Player" x="0" y="0" width="16" height="16">
+    <properties>
+      <property name="team" type="string" value="blue"/>
+      <property name="hp" type="int" value="100"/>
+    </properties>
+  </object>
+</template>

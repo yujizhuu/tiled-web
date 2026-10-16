@@ -162,6 +162,44 @@ function resolveOwner(map, flags) {
   throw new Error(`Unknown --target: ${flags.target} (use map|layer|object|tileset)`);
 }
 
+/**
+ * Map-level property type definitions (Tiled propertytypes / object types subset).
+ * Stored as map.propertytypes = [{ name, type, values?, members?, ... }].
+ */
+function listPropertyTypes(map) {
+  const list = map.propertytypes || map.propertyTypes || [];
+  if (!Array.isArray(list)) return [];
+  return list.map((t, i) => ({
+    index: i,
+    name: t.name || '',
+    type: t.type || t.kind || 'string',
+    values: t.values || undefined,
+    members: t.members || undefined,
+    storageType: t.storageType || undefined,
+    useAsPropertyValue: t.useAsPropertyValue,
+    useAsMapType: t.useAsMapType,
+    useAsLayerType: t.useAsLayerType,
+    useAsObjectType: t.useAsObjectType,
+    useAsTileType: t.useAsTileType,
+  }));
+}
+
+function getPropertyType(map, name) {
+  if (!name || name === true) throw new Error('prop types get requires --name <TypeName>');
+  const list = map.propertytypes || map.propertyTypes || [];
+  if (!Array.isArray(list)) throw new Error('Map has no propertytypes');
+  const found = list.find((t) => t.name === String(name));
+  if (!found) throw new Error(`Property type not found: ${name}`);
+  return {
+    name: found.name,
+    type: found.type || found.kind || 'string',
+    values: found.values,
+    members: found.members,
+    storageType: found.storageType,
+    raw: found,
+  };
+}
+
 module.exports = {
   toObjectMap,
   listProps,
@@ -172,4 +210,6 @@ module.exports = {
   resolveTileset,
   resolveObjectInLayer,
   ensureObjectProps,
+  listPropertyTypes,
+  getPropertyType,
 };

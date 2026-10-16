@@ -1,6 +1,6 @@
 'use strict';
 
-const { walkLayers, ensureLayerData, setTileAt, tileAt, firstTileLayer } = require('./util');
+const { walkLayers, ensureLayerData, setTileAt, tileAt, firstTileLayer, layerBounds } = require('./util');
 
 function listLayers(map) {
   const out = [];
@@ -17,6 +17,12 @@ function listLayers(map) {
     if (layer.type === 'tilelayer') {
       rec.width = layer.width || map.width;
       rec.height = layer.height || map.height;
+      rec.hasChunks = !!(layer.chunks && layer.chunks.length);
+      if (rec.hasChunks) {
+        const b = layerBounds(layer, map);
+        rec.chunkBounds = b;
+        rec.chunkCount = layer.chunks.length;
+      }
     }
     if (layer.type === 'objectgroup') {
       rec.objectCount = (layer.objects || []).length;
@@ -56,8 +62,12 @@ function addTileLayer(map, { name = 'Layer', width, height } = {}) {
     height: h,
     opacity: 1,
     visible: true,
-    data: Array(w * h).fill(0),
   };
+  if (map.infinite) {
+    layer.chunks = [];
+  } else {
+    layer.data = Array(w * h).fill(0);
+  }
   // unique name nudge
   const names = new Set();
   walkLayers(map.layers, (l) => names.add(l.name));
@@ -118,15 +128,17 @@ function renameLayer(map, layerSpec, newName) {
 
 function fillRect(map, layer, { x, y, width, height, gid }) {
   ensureLayerData(layer, map);
-  const lw = layer.width || map.width;
-  const lh = layer.height || map.height;
-  if (x < 0 || y < 0 || width < 1 || height < 1) {
+  if (!Number.isInteger(x) || !Number.isInteger(y) || width < 1 || height < 1) {
     throw new Error(`Invalid fill rect: x=${x} y=${y} w=${width} h=${height}`);
   }
-  if (x + width > lw || y + height > lh) {
-    throw new Error(
-      `Fill rect (${x},${y},${width},${height}) exceeds layer ${lw}x${lh}`
-    );
+  if (!map.infinite) {
+    const lw = layer.width || map.width;
+    const lh = layer.height || map.height;
+    if (x < 0 || y < 0 || x + width > lw || y + height > lh) {
+      throw new Error(
+        `Fill rect (${x},${y},${width},${height}) exceeds layer ${lw}x${lh}`
+      );
+    }
   }
   let count = 0;
   for (let yy = y; yy < y + height; yy++) {
@@ -140,13 +152,46 @@ function fillRect(map, layer, { x, y, width, height, gid }) {
 
 function getLayerGids(map, layer) {
   ensureLayerData(layer, map);
+  if (map.infinite || (layer.chunks && layer.chunks.length)) {
+    const b = layerBounds(layer, map);
+    if (!Number.isFinite(b.x)) {
+      return {
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
+        data: [],
+        name: layer.name,
+        id: layer.id,
+        infinite: true,
+        chunks: layer.chunks || [],
+      };
+    }
+    const data = [];
+    for (let y = b.y; y < b.y + b.height; y++) {
+      for (let x = b.x; x < b.x + b.width; x++) {
+        data.push(tileAt(layer, x, y, map) >>> 0);
+      }
+    }
+    return {
+      width: b.width,
+      height: b.height,
+      x: b.x,
+      y: b.y,
+      data,
+      name: layer.name,
+      id: layer.id,
+      infinite: !!map.infinite,
+      chunkCount: (layer.chunks || []).length,
+    };
+  }
   const w = layer.width || map.width;
   const h = layer.height || map.height;
   const data = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) data.push(tileAt(layer, x, y, map) >>> 0);
   }
-  return { width: w, height: h, data, name: layer.name, id: layer.id };
+  return { width: w, height: h, x: 0, y: 0, data, name: layer.name, id: layer.id };
 }
 
 function formatLayerCsv(gids) {
@@ -156,7 +201,7 @@ function formatLayerCsv(gids) {
     for (let x = 0; x < gids.width; x++) row.push(gids.data[y * gids.width + x]);
     rows.push(row.join(','));
   }
-  return rows.join('\n') + '\n';
+  return rows.join('\n') + (gids.height ? '\n' : '');
 }
 
 module.exports = {
