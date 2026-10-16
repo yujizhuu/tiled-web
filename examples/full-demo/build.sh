@@ -43,6 +43,18 @@ q set-tile $M --layer Deco --x 1 --y 10 --gid 7                         # 树（
 q set-tile $M --layer Deco --x 3 --y 10 --gid 7 --flip-h                # 水平翻转 0x80000000
 q set-tile $M --layer Deco --x 5 --y 10 --gid 7 --flip-v                # 垂直翻转 0x40000000
 q set-tile $M --layer Deco --x 7 --y 10 --gid 7 --flip-h --flip-d       # 旋转90° = H|D
+# 装点：花丛 / 灌木 / 草丛 / 石头 / 荷叶 / 路灯 / 水井 / 木桶 / 栅栏
+for xy in "1 1" "8 2" "11 5" "18 3" "2 12" "12 12" "19 12"; do set -- $xy; q set-tile $M --layer Deco --x $1 --y $2 --gid 11; done
+for xy in "0 4" "8 5" "17 5" "11 10" "0 13"; do set -- $xy; q set-tile $M --layer Deco --x $1 --y $2 --gid 16; done
+for xy in "7 1" "10 3" "6 12" "13 8" "19 0"; do set -- $xy; q set-tile $M --layer Deco --x $1 --y $2 --gid 29; done
+q set-tile $M --layer Deco --x 18 --y 8 --gid 23
+q set-tile $M --layer Deco --x 15 --y 10 --gid 30
+q set-tile $M --layer Deco --x 16 --y 9 --gid 30
+q set-tile $M --layer Deco --x 8 --y 6 --gid 28
+q set-tile $M --layer Deco --x 10 --y 8 --gid 28
+q set-tile $M --layer Deco --x 10 --y 5 --gid 27
+q set-tile $M --layer Deco --x 6 --y 6 --gid 32
+q fill $M --layer Deco --x 1 --y 11 --width 3 --height 1 --gid 25
 q get-layer $M --layer Ground --format csv -o $O/ground.csv
 t get-layer $M --layer Deco --format json | head -c 300; echo
 
@@ -115,8 +127,8 @@ echo "== 9. 洞穴: 无限地图 (chunks) =="
 C=$O/cave.tmj
 q new --width 16 --height 16 --tilewidth 16 --tileheight 16 --infinite -o $C
 q tileset add $C --firstgid 1 --source ../village.tsx
-q fill $C --x -4 --y -3 --width 24 --height 6 --gid 4
-q fill $C --x -3 --y -2 --width 22 --height 4 --gid 6
+q fill $C --x -4 --y -3 --width 24 --height 6 --gid 15   # 洞壁
+q fill $C --x -3 --y -2 --width 22 --height 4 --gid 14   # 洞底
 q set-tile $C --x 18 --y 0 --gid 9
 q stamp copy $C --layer 0 --x -4 --y -3 --width 3 --height 3 -o $O/cave.stamp.json
 q stamp paste $C --layer 0 --x 30 --y 30 --stamp $O/cave.stamp.json

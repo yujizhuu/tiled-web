@@ -5,7 +5,7 @@
 
 ```bash
 cd examples/full-demo
-python3 gen_tileset.py   # （可选）重新生成 tiles.png：8×4 个 16px 彩色带编号图块
+python3 gen_tileset.py   # （可选）重新生成 tiles.png：8×4 个 16px 程序化像素画图块（统一调色板，地面无缝平铺）
 bash build.sh            # 只调用 node cli/bin/tiled-web.js … 构建全部产物到 out/
 bash validate.sh         # （可选）需要 apt 安装 tiled xvfb：用官方 Tiled 做真值校验
 ```
@@ -16,12 +16,12 @@ bash validate.sh         # （可选）需要 apt 安装 tiled xvfb：用官方 
 
 | 文件 | 说明 |
 |---|---|
-| `tiles.png` / `gen_tileset.py` | 图块集图片（编号 = 本地 tile id；gid = id+1）。左上角白三角用来看翻转方向 |
+| `tiles.png` / `gen_tileset.py` | 图块集图片（原创程序化像素画，随仓库同许可；本地 id 布局见 gen_tileset.py 文件头，gid = id+1） |
 | `village.tsx` | 外部图块集：含 `terraintypes`（草/土/水）与 `wangsets`（角色 Grass/Dirt、边色 Road） |
 | `templates/chest.tx` | XML 模板：图块对象（宝箱，带 tileset 引用和属性） |
 | `templates/sign.tj` | JSON 模板：矩形对象（路牌） |
 | `rules/rules.txt` + `rules/shadow.tmj` | 自动地图规则：墙下方是空的 → 在 Shadow 层画阴影（rule map 也是用 CLI 搭出来的） |
-| `build.sh` | 构建脚本（117 次 CLI 调用） |
+| `build.sh` | 构建脚本（142 次 CLI 调用） |
 | `mcp_demo.py` | MCP stdio 客户端示例（按 MCP 规范逐行 JSON-RPC） |
 | `render.py` | 极简 TMJ→PNG 渲染器（支持外部 .tsx、H/V/D 翻转位、无限 chunks、对象） |
 | `validate.sh` | 上游 Tiled 真值校验 |
