@@ -213,3 +213,116 @@ module.exports = {
   listPropertyTypes,
   getPropertyType,
 };
+
+/**
+ * Add a property type definition to map.propertytypes.
+ * opts: { name, type, values?, members?, storageType?, useAs* }
+ */
+function addPropertyType(map, opts = {}) {
+  const name = opts.name != null && opts.name !== true ? String(opts.name) : '';
+  if (!name) throw new Error('prop types add requires --name <TypeName>');
+  const type = String(opts.type || opts.kind || 'class').toLowerCase();
+  if (!['enum', 'class', 'string', 'bool', 'int', 'float', 'color', 'file', 'object'].includes(type)) {
+    throw new Error(`Unknown property type --type: ${opts.type} (use enum|class|string|bool|int|float|…)`);
+  }
+
+  if (!Array.isArray(map.propertytypes)) map.propertytypes = [];
+  // Prefer lowercase propertytypes; drop camelCase twin if present
+  if (map.propertyTypes && map.propertyTypes !== map.propertytypes) {
+    delete map.propertyTypes;
+  }
+
+  if (map.propertytypes.some((t) => t && t.name === name)) {
+    throw new Error(`Property type already exists: ${name}`);
+  }
+
+  const rec = { name, type };
+
+  if (type === 'enum') {
+    let values = opts.values;
+    if (values == null || values === true) {
+      throw new Error('prop types add --type enum requires --values a,b,c or JSON array');
+    }
+    if (typeof values === 'string') {
+      const s = values.trim();
+      if (s.startsWith('[')) {
+        try {
+          values = JSON.parse(s);
+        } catch (err) {
+          throw new Error(`Invalid --values JSON: ${err.message}`);
+        }
+      } else {
+        values = s.split(',').map((v) => v.trim()).filter((v) => v !== '');
+      }
+    }
+    if (!Array.isArray(values) || !values.length) {
+      throw new Error('--values must be a non-empty list');
+    }
+    rec.values = values.map(String);
+    if (opts['storage-type'] != null && opts['storage-type'] !== true) {
+      rec.storageType = String(opts['storage-type']);
+    } else if (opts.storageType != null && opts.storageType !== true) {
+      rec.storageType = String(opts.storageType);
+    } else {
+      rec.storageType = 'string';
+    }
+  }
+
+  if (type === 'class') {
+    let members = opts.members;
+    if (members != null && members !== true) {
+      if (typeof members === 'string') {
+        try {
+          members = JSON.parse(members);
+        } catch (err) {
+          throw new Error(`Invalid --members JSON: ${err.message}`);
+        }
+      }
+      if (!Array.isArray(members)) throw new Error('--members must be a JSON array');
+      rec.members = members;
+    } else {
+      rec.members = [];
+    }
+  }
+
+  // Optional useAs* flags
+  const useFlags = [
+    'useAsPropertyValue',
+    'useAsMapType',
+    'useAsLayerType',
+    'useAsObjectType',
+    'useAsTileType',
+  ];
+  for (const f of useFlags) {
+    const kebab = f.replace(/([A-Z])/g, (m) => '-' + m.toLowerCase());
+    const raw = opts[f] != null ? opts[f] : opts[kebab];
+    if (raw === true || raw === 'true' || raw === '1') rec[f] = true;
+    else if (raw === false || raw === 'false' || raw === '0') rec[f] = false;
+  }
+
+  map.propertytypes.push(rec);
+  return rec;
+}
+
+/**
+ * Remove a property type by name.
+ */
+function removePropertyType(map, name) {
+  if (!name || name === true) throw new Error('prop types remove requires --name <TypeName>');
+  if (!Array.isArray(map.propertytypes)) {
+    if (Array.isArray(map.propertyTypes)) {
+      map.propertytypes = map.propertyTypes;
+      delete map.propertyTypes;
+    } else {
+      throw new Error('Map has no propertytypes');
+    }
+  }
+  const idx = map.propertytypes.findIndex((t) => t && t.name === String(name));
+  if (idx < 0) throw new Error(`Property type not found: ${name}`);
+  const [removed] = map.propertytypes.splice(idx, 1);
+  if (map.propertytypes.length === 0) delete map.propertytypes;
+  return removed;
+}
+
+module.exports.addPropertyType = addPropertyType;
+module.exports.removePropertyType = removePropertyType;

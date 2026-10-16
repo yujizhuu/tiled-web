@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * tiled-web CLI — Phase 5 (stamp / template / infinite + Phase 1–4)
+ * tiled-web CLI — Phase 6 (MCP / coord / prop types write / template tileset merge / wang+terrain list)
  * Humans: browser UI under tool/
  * Agents: this CLI
  */
@@ -32,7 +32,17 @@ const {
   summarizeObject,
   addObjectLayer,
 } = require('../lib/objects');
-const { listProps, getProp, setProp, removeProp, resolveOwner, listPropertyTypes, getPropertyType } = require('../lib/props');
+const {
+  listProps,
+  getProp,
+  setProp,
+  removeProp,
+  resolveOwner,
+  listPropertyTypes,
+  getPropertyType,
+  addPropertyType,
+  removePropertyType,
+} = require('../lib/props');
 const { applyFlipFlags, decodeGid } = require('../lib/gid');
 const { applyAutomapToMap } = require('../lib/automap');
 const {
@@ -47,15 +57,19 @@ const {
 const { replaceGid } = require('../lib/replace');
 const { copyStamp, pasteStamp, loadStamp, writeStampFile } = require('../lib/stamp');
 const { loadTemplate, templateInfo, applyTemplate } = require('../lib/template');
+const { tileToPixel, pixelToTile } = require('../lib/coord');
+const { listWang, listTerrain } = require('../lib/wang');
 
 const PKG = require('../package.json');
 
 function usage(code = 0) {
-  const text = `tiled-web ${PKG.version} — Phase 5 CLI (stamp / template / infinite)
+  const text = `tiled-web ${PKG.version} — Phase 6 CLI (MCP / coord / prop types / template merge / wang)
 
 Usage:
   tiled-web version
-  tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal|isometric|hexagonal] -o map.tmj
+  tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite]
+                [--orientation orthogonal|isometric|hexagonal|staggered]
+                [--staggeraxis y|x] [--staggerindex odd|even] [--hexsidelength N] -o map.tmj
   tiled-web info <map.tmj|map.tmx> [--format json|text]
   tiled-web export <map.tmj|map.tmx> -f tmj|tmx|csv -o <out>
 
@@ -95,6 +109,15 @@ Usage:
   tiled-web prop remove <map> --target ... --name KEY [-o out]
   tiled-web prop types list <map>
   tiled-web prop types get <map> --name TypeName
+  tiled-web prop types add <map> --name TypeName --type enum|class [--values a,b] [--members JSON] [-o out]
+  tiled-web prop types remove <map> --name TypeName [-o out]
+
+  tiled-web coord tile-to-pixel [<map>] --x TX --y TY [--orientation ...] [--tilewidth ...] [--tileheight ...]
+                                [--staggeraxis y|x] [--staggerindex odd|even] [--hexsidelength N] [--width|--height for iso]
+  tiled-web coord pixel-to-tile [<map>] --x PX --y PY [same flags]
+
+  tiled-web wang list <map>
+  tiled-web terrain list <map>
 
   tiled-web automap <map> --rules <rules.txt|rules.json|dir|rule.tmj> [--radius N] [--x X] [--y Y] [-o out]
 
@@ -103,17 +126,20 @@ Usage:
   tiled-web world add-map <file.world> --file map.tmj --x X --y Y [--width W] [--height H]
   tiled-web world remove-map <file.world> --file map.tmj|--index N
 
+  MCP (stdio): node cli/mcp-server.js   # see README for Cursor/Claude config
+
 Notes:
   - Mutations write in-place unless -o / --output is set.
   - Default --layer for tile cmds is the first tile layer.
   - Infinite maps (--infinite / map.infinite): set-tile/fill/get-layer/stamp/replace-gid use chunks[].
   - Stamp paste clips to map bounds on finite maps; infinite writes all cells (creates chunks).
-  - Template apply places an object instance (pixel --x/--y); supports .tx and JSON.
+  - Template apply places an object instance (pixel --x/--y); auto-merges template tilesets (safe firstgid).
   - Automap --radius N with --x/--y clips the scan region (also uses rule AutomappingRadius when center given).
-  - Tile --x/--y are tile indices (works for hex/iso data grids; no pixel↔tile helper yet).
+  - coord converts tile↔pixel for orthogonal / isometric / hexagonal / staggered (reads map or flags).
+  - wang/terrain list are data-only (no brush UI).
   - Object identity for prop --target object: --layer + --id (or --object-name).
-  - TMX support is minimal orthogonal (CSV data).
-  - Browser UI under tool/ is unchanged. MCP wrapper is optional future.
+  - TMX support is minimal orthogonal (CSV data); infinite TMJ export preserves chunks.
+  - Browser UI under tool/ is unchanged. MCP wrapper: cli/mcp-server.js (zero deps).
 
 Exit: 0 on success; non-zero on error (messages on stderr).
 `;
@@ -167,7 +193,7 @@ function ok(obj) {
 
 function cmdVersion() {
   process.stdout.write(`tiled-web ${PKG.version}\n`);
-  process.stdout.write(`phase: 5 (stamp/template/infinite + automap/world/objects/props/layers/tiles + create/info/export)\n`);
+  process.stdout.write(`phase: 6 (MCP/coord/prop-types-write/template-tileset-merge/wang+terrain + phases 1–5)\n`);
   process.stdout.write(`license: ${PKG.license}\n`);
 }
 
@@ -181,6 +207,9 @@ function cmdNew(flags) {
     tileheight: flags.tileheight || flags.tileHeight || 32,
     infinite: !!(flags.infinite),
     orientation: flags.orientation || 'orthogonal',
+    staggeraxis: flags.staggeraxis || flags['stagger-axis'],
+    staggerindex: flags.staggerindex || flags['stagger-index'],
+    hexsidelength: flags.hexsidelength || flags['hex-side-length'],
   });
   writeText(out, JSON.stringify(map, null, 2) + '\n');
   ok({
@@ -191,6 +220,9 @@ function cmdNew(flags) {
     tileheight: map.tileheight,
     infinite: !!map.infinite,
     orientation: map.orientation,
+    staggeraxis: map.staggeraxis,
+    staggerindex: map.staggerindex,
+    hexsidelength: map.hexsidelength,
   });
 }
 
@@ -480,11 +512,11 @@ function cmdProp(positional, flags) {
   const sub = positional[0];
   if (!sub) die('prop requires subcommand: list|get|set|remove|types');
 
-  // prop types list|get <map>
+  // prop types list|get|add|remove <map>
   if (sub === 'types' || sub === 'type' || sub === 'propertytypes') {
     const tsub = positional[1];
     const file = positional[2];
-    if (!tsub) die('prop types requires subcommand: list|get');
+    if (!tsub) die('prop types requires subcommand: list|get|add|remove');
     if (!file) die(`prop types ${tsub} requires a map path`);
     const map = loadMap(file);
     if (tsub === 'list') {
@@ -504,7 +536,23 @@ function cmdProp(positional, flags) {
       );
       return;
     }
-    die(`Unknown prop types subcommand: ${tsub} (use list|get)`);
+    if (tsub === 'add') {
+      const rec = addPropertyType(map, flags);
+      const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+      ok({ action: 'prop-types-add', propertytype: rec, ...saved });
+      return;
+    }
+    if (tsub === 'remove') {
+      const removed = removePropertyType(map, flags.name);
+      const saved = saveMap(map, { output: flags.output, inPlacePath: file });
+      ok({
+        action: 'prop-types-remove',
+        removed: { name: removed.name, type: removed.type || removed.kind },
+        ...saved,
+      });
+      return;
+    }
+    die(`Unknown prop types subcommand: ${tsub} (use list|get|add|remove)`);
   }
 
   const file = positional[1];
@@ -630,12 +678,15 @@ function cmdTemplate(positional, flags) {
     if (!tplPath || tplPath === true) die('template apply requires --template <file.tx|file.json>');
     const map = loadMap(file);
     const tpl = loadTemplate(tplPath);
-    const { layer, object } = applyTemplate(map, {
+    const { layer, object, tilesetMerge } = applyTemplate(map, {
       layer: flags.layer,
       template: tpl,
       x: flags.x,
       y: flags.y,
       createLayer: !!(flags['create-layer'] || flags.createLayer),
+      mapPath: file,
+      templatePath: tplPath,
+      mergeTileset: !(flags['no-merge-tileset'] || flags.noMergeTileset),
     });
     const saved = saveMap(map, { output: flags.output, inPlacePath: file });
     ok({
@@ -643,6 +694,7 @@ function cmdTemplate(positional, flags) {
       template: path.resolve(tplPath),
       layer: { id: layer.id, name: layer.name },
       object: summarizeObject(object),
+      tilesetMerge: tilesetMerge || null,
       ...saved,
     });
     return;
@@ -747,6 +799,105 @@ function cmdWorld(positional, flags) {
   die(`Unknown world subcommand: ${sub} (use info|new|add-map|remove-map)`);
 }
 
+
+function buildCoordMeta(file, flags) {
+  let meta = {};
+  if (file) {
+    const map = loadMap(file);
+    meta = {
+      orientation: map.orientation,
+      tilewidth: map.tilewidth,
+      tileheight: map.tileheight,
+      width: map.width,
+      height: map.height,
+      staggeraxis: map.staggeraxis,
+      staggerindex: map.staggerindex,
+      hexsidelength: map.hexsidelength,
+    };
+  }
+  // flags override map
+  if (flags.orientation && flags.orientation !== true) meta.orientation = flags.orientation;
+  if (flags.tilewidth != null && flags.tilewidth !== true) meta.tilewidth = flags.tilewidth;
+  if (flags.tileheight != null && flags.tileheight !== true) meta.tileheight = flags.tileheight;
+  if (flags.tileWidth != null) meta.tilewidth = flags.tileWidth;
+  if (flags.tileHeight != null) meta.tileheight = flags.tileHeight;
+  if (flags.width != null && flags.width !== true) meta.width = flags.width;
+  if (flags.height != null && flags.height !== true) meta.height = flags.height;
+  if (flags.staggeraxis != null && flags.staggeraxis !== true) meta.staggeraxis = flags.staggeraxis;
+  if (flags['stagger-axis'] != null && flags['stagger-axis'] !== true) meta.staggeraxis = flags['stagger-axis'];
+  if (flags.staggerindex != null && flags.staggerindex !== true) meta.staggerindex = flags.staggerindex;
+  if (flags['stagger-index'] != null && flags['stagger-index'] !== true) meta.staggerindex = flags['stagger-index'];
+  if (flags.hexsidelength != null && flags.hexsidelength !== true) meta.hexsidelength = flags.hexsidelength;
+  if (flags['hex-side-length'] != null && flags['hex-side-length'] !== true) {
+    meta.hexsidelength = flags['hex-side-length'];
+  }
+  return meta;
+}
+
+function cmdCoord(positional, flags) {
+  const sub = positional[0];
+  if (!sub) die('coord requires subcommand: tile-to-pixel|pixel-to-tile');
+  // positional[1] may be map path (optional)
+  const file = positional[1];
+  if (flags.x == null || flags.x === true) die(`coord ${sub} requires --x`);
+  if (flags.y == null || flags.y === true) die(`coord ${sub} requires --y`);
+  const meta = buildCoordMeta(file, flags);
+  if (sub === 'tile-to-pixel' || sub === 'tile2pixel' || sub === 't2p') {
+    const result = tileToPixel(meta, flags.x, flags.y);
+    process.stdout.write(
+      JSON.stringify({ action: 'tile-to-pixel', map: file ? path.resolve(file) : null, ...result }, null, 2) +
+        '\n'
+    );
+    return;
+  }
+  if (sub === 'pixel-to-tile' || sub === 'pixel2tile' || sub === 'p2t') {
+    const result = pixelToTile(meta, flags.x, flags.y);
+    process.stdout.write(
+      JSON.stringify({ action: 'pixel-to-tile', map: file ? path.resolve(file) : null, ...result }, null, 2) +
+        '\n'
+    );
+    return;
+  }
+  die(`Unknown coord subcommand: ${sub} (use tile-to-pixel|pixel-to-tile)`);
+}
+
+function cmdWang(positional, flags) {
+  const sub = positional[0] || 'list';
+  const file = positional[1] || (sub !== 'list' ? null : positional[0] === 'list' ? positional[1] : positional[0]);
+  // Accept: wang list <map>  OR  wang <map>
+  let mapFile = positional[1];
+  let subcmd = positional[0];
+  if (subcmd !== 'list' && positional.length === 1) {
+    mapFile = positional[0];
+    subcmd = 'list';
+  }
+  if (subcmd !== 'list') die(`Unknown wang subcommand: ${subcmd} (use list)`);
+  if (!mapFile) die('wang list requires a map path');
+  const map = loadMap(mapFile);
+  const wang = listWang(map, { mapPath: mapFile });
+  process.stdout.write(
+    JSON.stringify({ file: path.resolve(mapFile), count: wang.length, tilesets: wang }, null, 2) + '\n'
+  );
+}
+
+function cmdTerrain(positional, flags) {
+  let mapFile = positional[1];
+  let subcmd = positional[0];
+  if (subcmd !== 'list' && positional.length === 1) {
+    mapFile = positional[0];
+    subcmd = 'list';
+  }
+  if (!subcmd) subcmd = 'list';
+  if (subcmd !== 'list') die(`Unknown terrain subcommand: ${subcmd} (use list)`);
+  if (!mapFile) die('terrain list requires a map path');
+  const map = loadMap(mapFile);
+  const terrains = listTerrain(map, { mapPath: mapFile });
+  process.stdout.write(
+    JSON.stringify({ file: path.resolve(mapFile), count: terrains.length, tilesets: terrains }, null, 2) +
+      '\n'
+  );
+}
+
 function main() {
   try {
     const { cmd, flags, positional } = parseArgs(process.argv);
@@ -809,6 +960,17 @@ function main() {
       case 'template':
       case 'tpl':
         cmdTemplate(positional, flags);
+        break;
+      case 'coord':
+      case 'coords':
+        cmdCoord(positional, flags);
+        break;
+      case 'wang':
+        cmdWang(positional, flags);
+        break;
+      case 'terrain':
+      case 'terrains':
+        cmdTerrain(positional, flags);
         break;
       case 'help':
         usage(0);

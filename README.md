@@ -20,9 +20,9 @@ cd tiled-web
 
 macOS 也可双击 `启动.command`（同样会起本地静态服务）。
 
-## CLI（Phase 5 · Agent 用）
+## CLI（Phase 6 · Agent 用）
 
-无界面时可用命令行创建 / 查看 / 写瓦片 / 印章 / 模板 / 无限地图 chunks / 管图层与对象 / 自定义属性 / 图块集 / 自动地图 / World / 批量替换 GID / 导出地图。需要 **Node.js 18+**。零 npm 依赖。当前覆盖 agent 常用编辑能力（仍非完整编辑器对等；MCP 包装为可选后续）。
+无界面时可用命令行创建 / 查看 / 写瓦片 / 印章 / 模板 / 无限地图 chunks / 管图层与对象 / 自定义属性 / 图块集 / 自动地图 / World / 批量替换 GID / 坐标换算 / Wang·地形列举 / 导出地图。另提供 **零依赖 MCP stdio 包装**（`cli/mcp-server.js`）。需要 **Node.js 18+**。零 npm 依赖。
 
 ### 安装
 
@@ -36,39 +36,53 @@ npm link
 tiled-web version
 ```
 
+### MCP（Cursor / Claude）
+
+```bash
+node cli/mcp-server.js   # stdio JSON-RPC，Content-Length 帧
+```
+
+在 Cursor `~/.cursor/mcp.json`（或 Claude Desktop 配置）注册：
+
+```json
+{
+  "mcpServers": {
+    "tiled-web": {
+      "command": "node",
+      "args": ["/ABS/PATH/to/tiled-web/cli/mcp-server.js"]
+    }
+  }
+}
+```
+
+暴露的 tools 与 CLI 对齐：`tiled_version`、`tiled_info`、`tiled_new`、`tiled_set_tile`、`tiled_fill`、`tiled_get_layer`、`tiled_layer`、`tiled_object`、`tiled_prop`、`tiled_stamp`、`tiled_template`、`tiled_automap`、`tiled_world`、`tiled_replace_gid`、`tiled_export`、`tiled_coord`、`tiled_wang`、`tiled_terrain`。
+
 ### 命令
 
 | 命令 | 作用 |
 |------|------|
-| `tiled-web version` | 版本与阶段（0.5.0 / Phase 5） |
-| `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal\|isometric\|hexagonal] -o map.tmj` | 新建空瓦片层地图（可无限 / 指定朝向） |
+| `tiled-web version` | 版本与阶段（0.6.0 / Phase 6） |
+| `tiled-web new --width W --height H [--tilewidth TW] [--tileheight TH] [--infinite] [--orientation orthogonal\|isometric\|hexagonal\|staggered] [--staggeraxis y\|x] [--staggerindex odd\|even] [--hexsidelength N] -o map.tmj` | 新建空瓦片层地图 |
 | `tiled-web info map.tmj\|map.tmx [--format json\|text]` | 打印尺寸 / 图层 / 图块集（默认 JSON） |
-| `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID |
+| `tiled-web export map.tmj -f tmj\|tmx\|csv -o out` | 导出；CSV 为第一瓦片层 GID；无限地图 TMJ 保留 chunks |
 | `tiled-web set-tile <map> --x X --y Y --gid GID [--layer name\|index] [--flip-h] [--flip-v] [--flip-d] [-o out]` | 写单个瓦片 GID（可带翻转；无限地图可负坐标） |
 | `tiled-web fill <map> --x X --y Y --width W --height H --gid GID [--layer ...] [--flip-h\|v\|d] [-o out]` | 矩形填充 GID |
 | `tiled-web get-layer <map> [--layer name\|index] [--format json\|csv] [-o out]` | 读出单层 GID（无限地图返回 chunk 包围盒） |
 | `tiled-web stamp copy <map> --layer --x --y --width --height -o stamp.json` | 复制矩形区域 GID 为印章 |
 | `tiled-web stamp paste <map> --layer --x --y --stamp stamp.json [-o out]` | 粘贴印章（有限地图裁剪边界；保留翻转 GID） |
 | `tiled-web template info <file.tx\|file.tj\|json>` | 查看对象模板 |
-| `tiled-web template apply <map> --layer --template --x --y [--create-layer] [-o out]` | 在对象层放置模板实例（像素坐标） |
-| `tiled-web layer list <map>` | 列出图层 |
-| `tiled-web layer add <map> [--name NAME] [--type tile\|object] [-o out]` | 追加瓦片层或对象层 |
-| `tiled-web layer remove <map> --layer name\|index [-o out]` | 删除图层 |
-| `tiled-web layer rename <map> --layer name\|index --name NEW [-o out]` | 重命名图层 |
-| `tiled-web tileset add <map> --firstgid N [--name] [--image] [--source PATH.tsx] [--embed] [--tilewidth] [--tileheight] [--columns] [--tilecount] [--imagewidth] [--imageheight] [-o out]` | 添加图块集（可加载外部 `.tsx`；PNG 可读时推导 tilecount） |
-| `tiled-web tileset list <map>` | 列出图块集 |
-| `tiled-web object list <map> [--layer]` | 列出对象（JSON） |
-| `tiled-web object add <map> --layer <objectlayer> --x --y [--name] [--type\|--class] [--width] [--height] [--shape rectangle\|ellipse\|point\|polygon] [--points] [--id] [--create-layer] [-o out]` | 添加对象；`--create-layer` 时自动建对象层 |
-| `tiled-web object remove <map> --layer --id\|--name [-o out]` | 删除对象 |
-| `tiled-web object update <map> --layer --id ... [-o out]` | 更新位置 / 尺寸 / 名称 / 类型 / 形状 |
-| `tiled-web prop list\|get\|set\|remove <map> --target map\|layer\|object\|tileset ...` | 自定义属性；object 用 `--layer` + `--id`（或 `--object-name`），属性键为 `--name` |
-| `tiled-web prop types list\|get <map> [--name TypeName]` | 列出/查看地图 `propertytypes`（enum/class 等） |
-| `tiled-web automap <map> --rules <rules.txt\|rules.json\|dir\|rule.tmj> [--radius N] [--x X] [--y Y] [-o out]` | 应用 AutoMap；可选半径裁剪扫描区域 |
-| `tiled-web world info <file.world>` | 列出世界中的地图与坐标（JSON） |
-| `tiled-web world new -o file.world` | 新建空 `.world` |
-| `tiled-web world add-map <file.world> --file map.tmj --x X --y Y [--width] [--height]` | 向世界添加/更新地图条目 |
-| `tiled-web world remove-map <file.world> --file map.tmj\|--index N` | 从世界移除地图 |
-| `tiled-web replace-gid <map> --from GID --to GID [--layer] [--match-flips] [-o out]` | 批量替换瓦片 GID（地形类批处理；支持无限地图） |
+| `tiled-web template apply <map> --layer --template --x --y [--create-layer] [-o out]` | 放置模板实例；**自动并入缺失图块集**（安全 next firstgid + GID 重映射） |
+| `tiled-web layer list\|add\|remove\|rename …` | 图层管理 |
+| `tiled-web tileset add\|list …` | 图块集 |
+| `tiled-web object list\|add\|remove\|update …` | 对象层 |
+| `tiled-web prop list\|get\|set\|remove …` | 自定义属性 |
+| `tiled-web prop types list\|get\|add\|remove …` | 地图 `propertytypes`（enum/class 可写） |
+| `tiled-web coord tile-to-pixel\|pixel-to-tile [<map>] --x --y [--orientation …] [--tilewidth …] …` | 像素 ↔ 瓦片（正交 / 等距 / 六角 / staggered） |
+| `tiled-web wang list <map>` | 列举图块集 wangsets（只读数据） |
+| `tiled-web terrain list <map>` | 列举图块集 terraintypes（只读数据） |
+| `tiled-web automap <map> --rules … [--radius N] [--x] [--y] [-o out]` | 应用 AutoMap |
+| `tiled-web world info\|new\|add-map\|remove-map …` | `.world` |
+| `tiled-web replace-gid <map> --from GID --to GID …` | 批量替换 GID |
 
 错误写 stderr，成功数据写 stdout；失败非零退出码。写操作默认原地保存，可用 `-o` 另存。
 
@@ -83,28 +97,24 @@ node bin/tiled-web.js fill /tmp/level.tmj --layer Ground --x 0 --y 0 --width 32 
 node bin/tiled-web.js set-tile /tmp/level.tmj --layer Ground --x 4 --y 5 --gid 3 --flip-h
 node bin/tiled-web.js object add /tmp/level.tmj --layer Objects --create-layer --name Spawn --type Player --x 64 --y 48 --width 16 --height 16
 node bin/tiled-web.js prop set /tmp/level.tmj --target object --layer Objects --id 1 --name hp --value 100 --type int
-node bin/tiled-web.js prop set /tmp/level.tmj --target map --name author --value agent
-node bin/tiled-web.js object list /tmp/level.tmj
-node bin/tiled-web.js get-layer /tmp/level.tmj --layer Ground --format csv -o /tmp/ground.csv
+node bin/tiled-web.js prop types add /tmp/level.tmj --name Team --type enum --values red,blue
+node bin/tiled-web.js coord tile-to-pixel /tmp/level.tmj --x 4 --y 5
+node bin/tiled-web.js template apply /tmp/level.tmj --layer Objects --template fixtures/templates/crate.tj --x 128 --y 64
+node bin/tiled-web.js wang list /tmp/level.tmj
 node bin/tiled-web.js info /tmp/level.tmj
 node bin/tiled-web.js export /tmp/level.tmj -f tmx -o /tmp/level.tmx
 
 # Phase 4 — automap / world / replace-gid
 node bin/tiled-web.js automap fixtures/automap/work.tmj --rules fixtures/automap/rules.txt -o /tmp/auto.tmj
-node bin/tiled-web.js automap fixtures/automap/work.tmj --rules fixtures/automap/rules.txt --radius 2 --x 1 --y 1 -o /tmp/auto_clip.tmj
-node bin/tiled-web.js replace-gid /tmp/level.tmj --from 1 --to 2 --layer Ground
 node bin/tiled-web.js world new -o /tmp/demo.world
 node bin/tiled-web.js world add-map /tmp/demo.world --file /tmp/level.tmj --x 0 --y 0 --width 512 --height 384
-node bin/tiled-web.js world info /tmp/demo.world
 
 # Phase 5 — stamp / template / infinite
 node bin/tiled-web.js stamp copy /tmp/level.tmj --layer Ground --x 0 --y 0 --width 4 --height 4 -o /tmp/stamp.json
 node bin/tiled-web.js stamp paste /tmp/level.tmj --layer Ground --x 8 --y 8 --stamp /tmp/stamp.json
-node bin/tiled-web.js template info fixtures/templates/chest.tj
-node bin/tiled-web.js template apply /tmp/level.tmj --layer Objects --template fixtures/templates/spawn.tx --x 128 --y 64
 node bin/tiled-web.js new --width 64 --height 64 --infinite -o /tmp/inf.tmj
 node bin/tiled-web.js set-tile /tmp/inf.tmj --x 100 --y -5 --gid 1
-node bin/tiled-web.js prop types list /tmp/level.tmj
+node bin/tiled-web.js export /tmp/inf.tmj -f tmj -o /tmp/inf_out.tmj
 ```
 
 自检：
@@ -119,22 +129,20 @@ cd cli && ./test_smoke.sh
 - **Phase 2：** 图层与瓦片写入（`set-tile`、`fill`、`get-layer`、`layer *`、`tileset add|list`）✅
 - **Phase 3：** 对象层、属性、更完整的图块集引用（`.tsx` / PNG 尺寸 / GID 翻转）✅
 - **Phase 4：** `automap`（规则子集）、`world *`、`replace-gid` ✅
-- **Phase 5（当前）：** `stamp copy|paste`、`template info|apply`、无限地图 chunks、`automap --radius`、`prop types`；MCP 包装仍为可选后续 ✅
+- **Phase 5：** `stamp copy|paste`、`template info|apply`、无限地图 chunks、`automap --radius`、`prop types` list/get ✅
+- **Phase 6（当前）：** MCP stdio 包装、`coord` 像素↔瓦片、`prop types add|remove`、模板图块集自动并入、`wang list` / `terrain list`、无限 TMJ 导出确认 ✅
 
 #### Automap CLI 子集（相对网页）
 
 已实现：`rules.txt` / `rules.json` / 目录 / 单规则图；`Regions` + `Input_*` / `InputNot_*` / `Output_*` 瓦片层；`DeleteTiles` / `MatchOutsideMap` / `StrictEmpty`；对象层 `Output_*` 克隆；`--radius N --x/--y` 扫描裁剪（规则图 `AutomappingRadius` 在给了中心点时也会参与）。
 
-#### Phase 5 之后仍弱 / 未做（诚实清单）
+#### Phase 6 之后仍弱 / 未做（诚实清单 · 基本均为 GUI）
 
 - 实时绘制自动地图、规则可视化编辑器
-- Wang / 地形笔刷交互对等（CLI 仅有 `replace-gid` 等批处理）
+- Wang / 地形**笔刷交互**对等（CLI 已有 `wang list` / `terrain list` / `replace-gid` 等数据批处理；无 `wang apply-corner` 笔刷）
 - 撤销栈 / 历史
-- MCP 包装
-- 像素坐标 ↔ hex/iso 瓦片坐标换算（`--x/--y` 仍是瓦片索引；`new --orientation` 只写元数据）
-- 模板图块集 `firstgid` 自动并入地图、模板目录批量索引
-- `propertytypes` 仅 list/get（不写继承展开到对象默认属性）
-- TMX 无限 chunks / 压缩编码仍有限
+- 模板目录批量索引、`propertytypes` 继承展开到对象默认属性
+- TMX 无限 chunks / 压缩编码仍有限（无限地图请用 TMJ）
 
 ## 功能概览（相对 Tiled 1.2.4 · 网页）
 
@@ -170,15 +178,17 @@ tiled-web/
 ├── LICENSE           # AGPL-3.0
 ├── NOTICE
 ├── README.md
-├── cli/              # Node CLI（Phase 5）
+├── cli/              # Node CLI + MCP（Phase 6）
 │   ├── bin/tiled-web.js
-│   ├── lib/            # create/load/layers/objects/props/automap/world/…
+│   ├── mcp-server.js   # 零依赖 MCP stdio
+│   ├── lib/            # create/load/coord/wang/layers/objects/props/…
 │   ├── fixtures/automap/
 │   ├── fixtures/templates/
+│   ├── fixtures/wang/
 │   ├── package.json
 │   ├── test_smoke.sh
-│   ├── test_phase4.sh
-│   └── test_phase5.sh
+│   ├── test_phase4.sh … test_phase6.sh
+│   └── test_mcp_stdio.py
 └── tool/             # 静态站点根目录（http.server 从这个目录起）
     ├── index.html
     ├── tiled.css

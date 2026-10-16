@@ -8,9 +8,8 @@ FIX="$ROOT/fixtures"
 rm -rf "$TMP"
 mkdir -p "$TMP"
 
-echo "== version 0.5.0 =="
-"${CLI[@]}" version | grep -q '0.5.0'
-"${CLI[@]}" version | grep -q 'phase: 5'
+echo "== version (phase5 suite; CLI may be newer) =="
+"${CLI[@]}" version | grep -qE '0\.[5-9]|phase: [5-9]'
 
 echo "== stamp copy/paste =="
 "${CLI[@]}" new --width 10 --height 8 --tilewidth 16 --tileheight 16 -o "$TMP/stamp_map.tmj"

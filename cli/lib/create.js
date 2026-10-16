@@ -12,11 +12,15 @@ function createEmptyMap({
   layerName = 'Layer 1',
   infinite = false,
   orientation = 'orthogonal',
+  staggeraxis,
+  staggerindex,
+  hexsidelength,
 } = {}) {
   const w = assertPositiveInt(width, 'width');
   const h = assertPositiveInt(height, 'height');
   const tw = assertPositiveInt(tilewidth, 'tilewidth');
   const th = assertPositiveInt(tileheight, 'tileheight');
+  const orient = String(orientation || 'orthogonal').toLowerCase();
   const layer = {
     id: 1,
     name: layerName,
@@ -33,10 +37,10 @@ function createEmptyMap({
   } else {
     layer.data = Array(w * h).fill(0);
   }
-  return {
+  const map = {
     version: '1.2',
     tiledversion: '1.2.4',
-    orientation: String(orientation || 'orthogonal'),
+    orientation: orient,
     renderorder: 'right-down',
     width: w,
     height: h,
@@ -48,6 +52,17 @@ function createEmptyMap({
     layers: [layer],
     tilesets: [],
   };
+  if (orient === 'hexagonal' || orient === 'staggered') {
+    map.staggeraxis = String(staggeraxis || 'y').toLowerCase();
+    map.staggerindex = String(staggerindex || 'odd').toLowerCase();
+    if (orient === 'hexagonal') {
+      map.hexsidelength =
+        hexsidelength != null && hexsidelength !== true
+          ? Number(hexsidelength) || 0
+          : Math.floor(th / 2);
+    }
+  }
+  return map;
 }
 
 function assertPositiveInt(v, name) {

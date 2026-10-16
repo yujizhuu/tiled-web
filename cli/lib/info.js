@@ -41,6 +41,9 @@ function mapInfo(map, filePath) {
     tilewidth: map.tilewidth,
     tileheight: map.tileheight,
     infinite: !!map.infinite,
+    staggeraxis: map.staggeraxis || null,
+    staggerindex: map.staggerindex || null,
+    hexsidelength: map.hexsidelength != null ? map.hexsidelength : null,
     layerCount: (map.layers || []).length,
     layers: collectLayerSummaries(map),
     tilesets: (map.tilesets || []).map((t) => ({
